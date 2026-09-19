@@ -176,17 +176,39 @@ questions once it is up.
 
 ## 8 · Release checklist
 
-- [ ] Repository created empty, URL sent
-- [ ] Placeholders replaced, `git init` + commit + `v1.0.0` tag
-- [ ] Pushed over SSH (or by you)
-- [ ] Description and Website set
-- [ ] 20 topics added, `dsh-plugin` among them
-- [ ] Social preview uploaded (`docs/assets/og.jpg`)
-- [ ] Pages enabled and the URL loads
-- [ ] npm published, `npm view dsh-frutiger-aero version` returns `1.0.0`
-- [ ] `dsh plugin --profile web add dsh-frutiger-aero` verified on a clean profile
-- [ ] Registry PR opened
-- [ ] Release notes published from `CHANGELOG.md`
+- [x] Repository created empty, URL sent
+- [x] Placeholders replaced (`node scripts/set-repo.mjs Hotsteel2901`), commit + `v1.0.0` tag
+- [x] Pushed to `main` and the tag — no credential persisted (verified: `.git/config` is clean)
+- [x] Description and Website set
+- [x] 20 topics added, `dsh-plugin` among them
+- [ ] **Social preview uploaded** — `docs/assets/og.jpg` (Settings → General). No API exists for this one.
+- [x] Pages enabled, landing page live at <https://hotsteel2901.github.io/dsh-frutiger-aero/> — 19/19 checks pass against the live site
+- [x] Release published from `CHANGELOG.md` (<https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.0.0>)
+- [x] Registry PR opened — [awesome-dsh-plugin#5431](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5431)
+- [ ] **npm published** — needs an npm account; the GitHub token cannot do it (see below)
+- [ ] `dsh plugin --profile web add dsh-frutiger-aero` verified on a clean profile (blocked on npm)
+- [ ] **Rotate the GitHub token** that was used for the push
+
+### The two that need you
+
+**Social preview.** GitHub has no API for it. Settings → General → Social preview → upload
+`docs/assets/og.jpg`. Until then every shared link renders a grey card.
+
+**npm.** The publish workflow is in place and skips itself cleanly while `NPM_TOKEN` is unset, so
+the repository never shows a red X for it. To publish:
+
+```sh
+cd packages/frutiger-aero
+npm login
+npm publish --access public
+```
+
+…or add an `NPM_TOKEN` repository secret (npm automation token, publish rights) and re-run the
+*Publish to npm* workflow. Tags only — it never publishes from a branch push, and it fails the
+build if the committed `lib/` does not match `src/`.
+
+Once npm is live, three things resolve at once: the one-liner install works, the two shields.io
+badges in the README start rendering, and the registry can map the listing to its download stats.
 
 ## 9 · After the release
 
