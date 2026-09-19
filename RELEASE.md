@@ -184,7 +184,7 @@ questions once it is up.
 - [ ] **Social preview uploaded** — `docs/assets/og.jpg` (Settings → General). No API exists for this one.
 - [x] Pages enabled, landing page live at <https://hotsteel2901.github.io/dsh-frutiger-aero/> — 19/19 checks pass against the live site
 - [x] Release published from `CHANGELOG.md` (<https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.0.0>)
-- [x] Registry PR opened — [awesome-dsh-plugin#5431](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/5431)
+- [ ] **Registry PR** — prepared in `submission/`, deliberately left to you (see step 7)
 - [ ] **npm published** — needs an npm account; the GitHub token cannot do it (see below)
 - [ ] `dsh plugin --profile web add dsh-frutiger-aero` verified on a clean profile (blocked on npm)
 - [ ] **Rotate the GitHub token** that was used for the push
