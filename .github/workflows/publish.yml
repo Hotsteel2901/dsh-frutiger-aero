@@ -1,0 +1,43 @@
+# Publish `packages/frutiger-aero` to npm on a version tag.
+#
+# Requires an `NPM_TOKEN` repository secret (an npm automation token with publish
+# rights). Without it the workflow fails at the npm step and nothing is
+# published — it never publishes anything on a branch push.
+name: Publish to npm
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # The built artifacts are committed, but a release must not ship a stale
+      # bundle: rebuild and fail if that changes anything.
+      - name: Rebuild and verify the bundle is current
+        run: |
+          node packages/frutiger-aero/build.mjs
+          if ! git diff --quiet -- packages/frutiger-aero/lib; then
+            echo "::error::lib/ is out of date — run 'node packages/frutiger-aero/build.mjs' and commit the result"
+            git --no-pager diff --stat -- packages/frutiger-aero/lib
+            exit 1
+          fi
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        working-directory: packages/frutiger-aero
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

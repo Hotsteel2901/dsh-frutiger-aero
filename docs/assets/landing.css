@@ -1,0 +1,1370 @@
+/*
+ * dsh-frutiger-aero — landing page.
+ *
+ * The page is built the same way the plugin is, and for the same reason: the
+ * wallpaper is one fixed, `contain: strict` layer of large feathered gradients,
+ * so it is already the look a blur would produce and no filter ever has to be
+ * recomputed as things move. Everything that moves moves on `transform` or
+ * `opacity` only.
+ *
+ * Three budgets are enforced here rather than assumed:
+ *
+ *   1. **No webfonts.** The whole page uses the system UI stack, so there are
+ *      zero font requests and no layout shift waiting for one.
+ *   2. **Nothing animates off screen.** `landing.js` toggles `is-offscreen` on
+ *      each section through an IntersectionObserver, and every loop in this file
+ *      is gated on it — a background tab and a section below the fold both cost
+ *      nothing.
+ *   3. **Reduced motion means a finished page, not a broken one.** The scene
+ *      stays (it is the theme) and every transition collapses to nothing.
+ */
+
+/* ══ Tokens ═════════════════════════════════════════════════════════════════ */
+
+:root {
+  color-scheme: light;
+
+  --sky-top: #7fd0f0;
+  --sky-mid: #bfeaff;
+  --sky-low: #eefaff;
+  --sun: rgb(255 251 214 / 92%);
+  --sun-glow: rgb(255 246 205 / 42%);
+  --hill-far: #d3f0de;
+  --hill-near: #a8e2bd;
+  --water-top: #a6e4f4;
+  --water-deep: #6cc4e0;
+  --caustic: rgb(255 255 255 / 46%);
+  --bubble: rgb(255 255 255 / 78%);
+  --bubble-core: rgb(255 255 255 / 96%);
+  --bubble-rim: rgb(126 210 246 / 62%);
+  --veil: rgb(255 255 255 / 34%);
+
+  --ink: #08283c;
+  --ink-soft: #38617d;
+  --ink-faint: #456f8c;
+  --accent: #129dd0;
+  --accent-deep: #0d7cb4;
+
+  --pane: rgb(255 255 255 / 62%);
+  --pane-strong: rgb(255 255 255 / 84%);
+  --pane-soft: rgb(255 255 255 / 38%);
+  --rim: rgb(255 255 255 / 72%);
+  --hairline: rgb(20 108 158 / 20%);
+  --shadow: rgb(10 70 105 / 14%);
+  --shadow-deep: rgb(8 60 92 / 22%);
+  --glow: rgb(120 200 240 / 22%);
+  --gloss-top: rgb(255 255 255 / 90%);
+  --gloss-mid: rgb(255 255 255 / 34%);
+  --gloss-foot: rgb(255 255 255 / 40%);
+
+  --radius: 18px;
+  --radius-lg: 26px;
+  --blur: 20px;
+  --saturate: 1.5;
+
+  --shell: min(1160px, 100% - 40px);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+html[data-scheme='dark'] {
+  color-scheme: dark;
+
+  --sky-top: #03202f;
+  --sky-mid: #062c41;
+  --sky-low: #0a3d58;
+  --sun: rgb(150 235 255 / 34%);
+  --sun-glow: rgb(64 190 235 / 26%);
+  --hill-far: #0d3f36;
+  --hill-near: #082a26;
+  --water-top: #0d6f9e;
+  --water-deep: #021c2c;
+  --caustic: rgb(130 226 255 / 22%);
+  --bubble: rgb(168 236 255 / 44%);
+  --bubble-core: rgb(214 246 255 / 62%);
+  --bubble-rim: rgb(112 214 250 / 52%);
+  --veil: rgb(4 20 30 / 34%);
+
+  --ink: #e8f8ff;
+  --ink-soft: #a8cee2;
+  --ink-faint: #8fb8d0;
+  --accent: #4cc8ef;
+  --accent-deep: #2aa6d4;
+
+  --pane: rgb(13 44 62 / 68%);
+  --pane-strong: rgb(17 53 73 / 86%);
+  --pane-soft: rgb(10 36 52 / 52%);
+  --rim: rgb(178 234 255 / 30%);
+  --hairline: rgb(122 214 250 / 24%);
+  --shadow: rgb(0 8 14 / 34%);
+  --shadow-deep: rgb(0 6 12 / 48%);
+  --glow: rgb(70 200 245 / 18%);
+  --gloss-top: rgb(190 240 255 / 24%);
+  --gloss-mid: rgb(150 220 255 / 10%);
+  --gloss-foot: rgb(150 220 255 / 12%);
+}
+
+/* ══ Base ═══════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--sky-low);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 0.5em;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: clamp(2.1rem, 5.4vw, 3.6rem);
+}
+
+h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.2rem);
+}
+
+h3 {
+  font-size: 1.08rem;
+  letter-spacing: -0.005em;
+}
+
+p {
+  margin: 0 0 1em;
+}
+
+a {
+  color: var(--accent-deep);
+  text-decoration-color: color-mix(in srgb, var(--accent-deep) 40%, transparent);
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  text-decoration-color: currentColor;
+}
+
+code,
+kbd,
+pre {
+  font-family: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.9em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.shell {
+  width: var(--shell);
+  margin-inline: auto;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 100;
+  padding: 12px 18px;
+  border-radius: 0 0 14px 0;
+  background: var(--pane-strong);
+  color: var(--ink);
+}
+
+.skip:focus {
+  left: 0;
+}
+
+/* ══ The wallpaper ══════════════════════════════════════════════════════════
+   One fixed layer behind everything, `contain: strict` so it never takes part
+   in layout, and nine child layers of sky, sun, hills, water, caustics and
+   bubbles. Deliberately NOT promoted with `will-change`: a promoted
+   negative-z-index layer is how the same scene ended up painted over the app's
+   own content in an early build of the plugin. */
+
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.scene__layer {
+  position: absolute;
+  inset: 0;
+}
+
+.scene__sky {
+  background:
+    radial-gradient(120% 80% at 18% 118%, var(--glow) 0%, transparent 62%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 46%, var(--sky-low) 74%);
+}
+
+.scene__sun {
+  background:
+    radial-gradient(circle at 76% 14%, var(--sun) 0 2.4%, transparent 3%),
+    radial-gradient(circle at 76% 14%, var(--sun-glow) 0%, transparent 32%);
+  animation: sun-breathe 26s ease-in-out infinite;
+}
+
+.scene__haze {
+  background: linear-gradient(
+    180deg,
+    transparent 44%,
+    color-mix(in srgb, var(--veil) 90%, transparent) 62%,
+    transparent 88%
+  );
+}
+
+.scene__rays {
+  opacity: 0.4;
+  background: repeating-linear-gradient(
+    102deg,
+    transparent 0 11%,
+    color-mix(in srgb, var(--gloss-top) 24%, transparent) 11% 19%,
+    transparent 19% 34%
+  );
+  mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 50%) 40%, transparent 72%);
+  transform-origin: 76% 5%;
+  animation: rays-drift 44s ease-in-out infinite;
+}
+
+.scene__hills {
+  top: auto;
+  bottom: 12%;
+  height: 20%;
+}
+
+.scene__hills--far {
+  background:
+    radial-gradient(58% 100% at 14% 108%, var(--hill-far) 0 99%, transparent 100%),
+    radial-gradient(72% 100% at 52% 116%, var(--hill-far) 0 99%, transparent 100%),
+    radial-gradient(54% 100% at 92% 110%, var(--hill-far) 0 99%, transparent 100%);
+}
+
+.scene__hills--near {
+  bottom: 8%;
+  height: 15%;
+  background:
+    radial-gradient(64% 100% at 26% 118%, var(--hill-near) 0 99%, transparent 100%),
+    radial-gradient(58% 100% at 78% 124%, var(--hill-near) 0 99%, transparent 100%);
+}
+
+.scene__water {
+  top: auto;
+  height: 16%;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--gloss-top) 42%, transparent) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--water-top) 0%, var(--water-deep) 100%);
+}
+
+.scene__caustics {
+  top: auto;
+  height: 16%;
+  opacity: 0.55;
+  mix-blend-mode: soft-light;
+  background-image:
+    repeating-radial-gradient(
+      ellipse 60% 30% at 30% 10%,
+      color-mix(in srgb, var(--caustic) 55%, transparent) 0 1.4%,
+      transparent 1.4% 7%
+    ),
+    repeating-radial-gradient(
+      ellipse 40% 22% at 70% 0%,
+      color-mix(in srgb, var(--caustic) 38%, transparent) 0 1.1%,
+      transparent 1.1% 6%
+    );
+  animation: caustics 24s linear infinite;
+}
+
+.scene__bubbles {
+  overflow: hidden;
+}
+
+.scene__bubble {
+  position: absolute;
+  left: var(--x, 40%);
+  bottom: -14vh;
+  width: var(--size, 40px);
+  height: var(--size, 40px);
+  border-radius: 50%;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 32% 26%, var(--bubble-core) 0 12%, transparent 34%),
+    radial-gradient(circle at 36% 30%, var(--bubble) 0 30%, transparent 62%),
+    radial-gradient(circle at 50% 50%, transparent 58%, var(--bubble-rim) 88%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--bubble-rim) 60%, transparent),
+    inset -3px -5px 10px color-mix(in srgb, var(--bubble-rim) 30%, transparent),
+    inset 3px 4px 12px color-mix(in srgb, var(--bubble-core) 45%, transparent),
+    0 0 14px color-mix(in srgb, var(--bubble-rim) 35%, transparent);
+  animation: bubble-rise var(--duration, 24s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+/* A background tab, a hidden section, or a device that asked for less all stop
+   the loops in one place rather than nine. */
+html.is-idle .scene *,
+html.is-idle .scene {
+  animation-play-state: paused;
+}
+
+html.is-lite .scene__rays,
+html.is-lite .scene__caustics,
+html.is-lite .scene::after {
+  display: none;
+}
+
+/* Film grain, in the scene rather than over the app — the way grain is behind a
+   window — and gone entirely below the full tier. */
+.scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@keyframes bubble-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.72);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--opacity, 0.5);
+  }
+  50% {
+    transform: translate3d(calc(var(--drift, 0vw) * 0.55), calc(-58vh - var(--lift, 0vh)), 0) scale(0.92);
+    opacity: var(--opacity, 0.5);
+  }
+  88% {
+    opacity: calc(var(--opacity, 0.5) * 0.5);
+  }
+  100% {
+    transform: translate3d(var(--drift, 0vw), calc(-116vh - var(--lift, 0vh)), 0) scale(1.04);
+    opacity: 0;
+  }
+}
+
+@keyframes sun-breathe {
+  0%,
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06) translate3d(-1.2%, 0.8%, 0);
+    opacity: 0.88;
+  }
+}
+
+@keyframes rays-drift {
+  0%,
+  100% {
+    transform: rotate(-1.6deg) scale(1.12);
+    opacity: 0.42;
+  }
+  50% {
+    transform: rotate(1.4deg) scale(1.18);
+    opacity: 0.62;
+  }
+}
+
+@keyframes caustics {
+  0% {
+    background-position: 0% 0%, 40% 0%;
+  }
+  100% {
+    background-position: 120% 18%, -80% 12%;
+  }
+}
+
+/* ══ Glass primitives ═══════════════════════════════════════════════════════
+   One recipe in three weights. Every pane is a translucent fill plus a bright
+   top rim, a soft inner glow and a deep coloured shadow — the four things that
+   make a flat rectangle read as a sheet of glass. */
+
+.glass {
+  position: relative;
+  border-radius: var(--radius);
+  background: var(--pane);
+  border: 1px solid var(--rim);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rim) 40%, transparent),
+    0 12px 30px -14px var(--shadow-deep),
+    inset 0 1px 0 var(--rim),
+    inset 0 -18px 34px -24px var(--glow);
+  backdrop-filter: blur(var(--blur)) saturate(var(--saturate));
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(var(--saturate));
+}
+
+.glass--strong {
+  background: var(--pane-strong);
+}
+
+.glass--soft {
+  background: var(--pane-soft);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--rim) 30%, transparent),
+    0 10px 26px -16px var(--shadow),
+    inset 0 1px 0 var(--rim);
+}
+
+/* The gloss. A five-stop vertical gradient rather than a pseudo-element, so it
+   needs no `position: relative` and no `overflow: hidden` on the thing it
+   decorates: a crisp specular rim, a soft sheen, the specular break where the
+   surface turns away from the light, and a faint reflected floor. */
+.glossy {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--gloss-top) 70%, transparent) 0 1px,
+    color-mix(in srgb, var(--gloss-mid) 34%, transparent) 1px,
+    transparent 46%,
+    transparent 54%,
+    color-mix(in srgb, var(--gloss-foot) 18%, transparent) 100%
+  );
+}
+
+html.is-lite .glass,
+html.is-lite .glass--strong {
+  /* A translucent pane with an animated wallpaper behind it costs a filter
+     re-run for every frame the wallpaper moves. Below the top tier the pane
+     becomes an opaque-ish sheet instead. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: color-mix(in srgb, var(--pane-strong) 92%, var(--sky-low));
+}
+
+/* ══ Header ═════════════════════════════════════════════════════════════════ */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 10px 0;
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  background: color-mix(in srgb, var(--sky-low) 62%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--hairline) 60%, transparent);
+  transition: box-shadow 300ms var(--ease);
+}
+
+.header.is-stuck {
+  box-shadow: 0 10px 30px -18px var(--shadow-deep);
+}
+
+.header__inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.brand__drop {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 50% 50% 50% 4px;
+  background:
+    radial-gradient(circle at 34% 28%, var(--bubble-core) 0 20%, transparent 52%),
+    linear-gradient(160deg, var(--accent) 0%, var(--accent-deep) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--rim),
+    0 4px 10px -4px var(--shadow-deep);
+  transform: rotate(-45deg);
+}
+
+.brand__sub {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.header__spacer {
+  margin-left: auto;
+}
+
+.scheme {
+  padding: 5px 10px;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.lang {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--pane-soft);
+  border: 1px solid var(--rim);
+}
+
+.lang__btn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.lang__btn[aria-pressed='true'] {
+  color: var(--ink);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--gloss-top) 80%, transparent) 0 1px,
+    transparent 55%,
+    color-mix(in srgb, var(--gloss-foot) 22%, transparent) 100%
+  );
+  background-color: color-mix(in srgb, var(--pane-strong) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+
+/* ══ Buttons ════════════════════════════════════════════════════════════════ */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  border: 1px solid var(--rim);
+  font: inherit;
+  font-weight: 650;
+  font-size: 0.95rem;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  background-color: var(--pane);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--gloss-top) 66%, transparent) 0 1px,
+    color-mix(in srgb, var(--gloss-mid) 32%, transparent) 1px,
+    transparent 48%,
+    color-mix(in srgb, var(--gloss-foot) 20%, transparent) 100%
+  );
+  box-shadow:
+    0 10px 24px -14px var(--shadow-deep),
+    inset 0 1px 0 var(--rim);
+  transition: transform 220ms var(--ease), box-shadow 220ms var(--ease), filter 220ms ease;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 34px -16px var(--shadow-deep),
+    inset 0 1px 0 var(--rim);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.985);
+}
+
+.btn--primary {
+  color: #fff;
+  border-color: color-mix(in srgb, #fff 34%, transparent);
+  background-color: var(--accent-deep);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, #fff 46%, transparent) 0 1px,
+    color-mix(in srgb, #fff 20%, transparent) 1px,
+    transparent 52%,
+    color-mix(in srgb, #000 12%, transparent) 100%
+  );
+  text-shadow: 0 1px 1px rgb(0 40 70 / 26%);
+}
+
+html[data-scheme='dark'] .btn--primary {
+  color: #04121c;
+  text-shadow: none;
+}
+
+/* ══ Hero ═══════════════════════════════════════════════════════════════════ */
+
+.hero {
+  position: relative;
+  padding: clamp(48px, 8vw, 96px) 0 clamp(40px, 6vw, 72px);
+}
+
+.hero__grid {
+  display: grid;
+  gap: clamp(28px, 5vw, 56px);
+  align-items: center;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 980px) {
+  .hero__grid {
+    grid-template-columns: 1.05fr 0.95fr;
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  padding: 5px 14px 5px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  color: var(--ink-soft);
+  background: var(--pane-soft);
+  border: 1px solid var(--rim);
+}
+
+.eyebrow__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.lede {
+  font-size: clamp(1rem, 1.6vw, 1.14rem);
+  color: var(--ink-soft);
+  max-width: 56ch;
+}
+
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 26px 0 22px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: var(--pane-soft);
+  border: 1px solid color-mix(in srgb, var(--rim) 70%, transparent);
+}
+
+.chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+/* ══ The install command box ════════════════════════════════════════════════ */
+
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 10px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--sky-low) 30%, var(--pane-strong));
+  border: 1px solid var(--rim);
+  box-shadow: inset 0 1px 0 var(--rim), inset 0 2px 8px -4px var(--shadow);
+  max-width: 620px;
+}
+
+.cmd code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  color: var(--ink);
+  font-size: 0.86rem;
+  scrollbar-width: none;
+}
+
+.cmd code::-webkit-scrollbar {
+  display: none;
+}
+
+.cmd__copy {
+  flex: none;
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+
+.cmd__copy[data-copied='true'] {
+  color: #0d6b3f;
+  border-color: color-mix(in srgb, #2fa96a 50%, transparent);
+}
+
+html[data-scheme='dark'] .cmd__copy[data-copied='true'] {
+  color: #7ee0ab;
+}
+
+/* The copy button swaps *labels* rather than its text content: the two
+   languages are both in the DOM, so `textContent` would read "Copy复制" and
+   restoring it would print both. */
+.cmd__copy .cmd__done {
+  display: none;
+}
+
+.cmd__copy[data-copied='true'] .cmd__label {
+  display: none;
+}
+
+.cmd__copy[data-copied='true'] .cmd__done {
+  display: inline;
+}
+
+/* ══ Devices ════════════════════════════════════════════════════════════════
+   A laptop frame and a phone frame built from CSS only, holding the real
+   screenshots. The parallax is a transform driven by one rAF-throttled pointer
+   listener; it is not installed at all on coarse pointers or reduced motion. */
+
+.devices {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0;
+}
+
+.device {
+  border-radius: 20px;
+  padding: 8px;
+  background: color-mix(in srgb, var(--pane-strong) 80%, transparent);
+  border: 1px solid var(--rim);
+  box-shadow:
+    0 26px 60px -26px var(--shadow-deep),
+    inset 0 1px 0 var(--rim);
+  transform: translate3d(0, 0, 0);
+  transition: transform 500ms var(--ease);
+}
+
+.device img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 13px;
+}
+
+.device--laptop {
+  /* `flex: 1 1 auto` with `min-width: 0`, not `width: 100%`: as a flex item the
+     laptop has to be allowed to shrink so the phone, which overlaps it by a
+     fixed negative margin, does not push the row past the viewport. */
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.device--phone {
+  width: 168px;
+  margin-left: -46px;
+  margin-bottom: 26px;
+  border-radius: 26px;
+  padding: 6px;
+  z-index: 2;
+  flex: none;
+  box-shadow:
+    0 30px 60px -22px var(--shadow-deep),
+    0 0 0 1px color-mix(in srgb, var(--rim) 60%, transparent),
+    inset 0 1px 0 var(--rim);
+}
+
+.device--phone img {
+  border-radius: 21px;
+}
+
+@media (max-width: 700px) {
+  .device--phone {
+    width: 118px;
+    margin-left: -34px;
+    margin-bottom: 16px;
+  }
+}
+
+/* ══ The aurora ═════════════════════════════════════════════════════════════
+   The one looping element inside the document rather than the wallpaper, and
+   the reason `data-loop-scope` exists: it is a 36-second transform drift on a
+   soft radial gradient, and the moment its section scrolls out of view the
+   observer pauses it. Two of them, counter-drifting, at a scale nothing can
+   read as motion unless you watch it. */
+
+.aurora {
+  position: absolute;
+  inset: -20% -10%;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.55;
+  background:
+    radial-gradient(38% 46% at 22% 34%, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 70%),
+    radial-gradient(34% 42% at 76% 62%, color-mix(in srgb, var(--glow) 60%, transparent) 0%, transparent 72%);
+  animation: aurora-drift 36s ease-in-out infinite;
+}
+
+@keyframes aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(-3%, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(4%, -3%, 0) scale(1.08);
+  }
+}
+
+html.is-lite .aurora {
+  animation: none;
+}
+
+/* Grid and flex children default to `min-width: auto`, which means one long
+   unbreakable string anywhere inside can widen the page. Every layout container
+   in this file therefore opts out explicitly. */
+.cards > *,
+.methods > *,
+.split > *,
+.hero__grid > *,
+.compare > *,
+.faq > *,
+.method .cmd > * {
+  min-width: 0;
+}
+
+/* ══ Sections ═══════════════════════════════════════════════════════════════ */
+
+.section {
+  padding: clamp(52px, 8vw, 92px) 0;
+  position: relative;
+  /* The aurora is deliberately wider than its section, so the section has to
+     clip it. Without this the page grows a horizontal scrollbar and — on a
+     phone, where Chromium's mobile emulation reports `innerWidth` from the
+     document width — `innerWidth` stops matching the device, which is how a
+     390px phone ended up classified as a desktop. */
+  overflow: hidden;
+}
+
+.section__head {
+  max-width: 62ch;
+  margin-bottom: clamp(26px, 4vw, 42px);
+}
+
+.section__head p {
+  color: var(--ink-soft);
+  font-size: 1.03rem;
+}
+
+/* Scroll reveal. One class, one transform, one opacity — and every section
+   that is off screen has its loops paused, so scrolling a long page never runs
+   more animation than the viewport can show. */
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity 620ms var(--ease), transform 620ms var(--ease);
+}
+
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.is-offscreen * {
+  animation-play-state: paused !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* ══ Feature cards ══════════════════════════════════════════════════════════ */
+
+.cards {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+}
+
+.card {
+  padding: 24px 22px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.card__icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 14px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--accent-deep);
+  background:
+    radial-gradient(circle at 32% 24%, var(--bubble-core) 0 14%, transparent 46%),
+    linear-gradient(160deg, color-mix(in srgb, var(--accent) 26%, transparent), transparent);
+  border: 1px solid var(--rim);
+  box-shadow: inset 0 1px 0 var(--rim);
+}
+
+.card__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+.card h3 {
+  margin-bottom: 8px;
+}
+
+/* ══ Split sections ═════════════════════════════════════════════════════════ */
+
+.split {
+  display: grid;
+  gap: clamp(24px, 4vw, 52px);
+  align-items: center;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 900px) {
+  .split {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .split--flip > *:first-child {
+    order: 2;
+  }
+}
+
+.ticks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.ticks li {
+  position: relative;
+  padding-left: 30px;
+  color: var(--ink-soft);
+  font-size: 0.96rem;
+}
+
+.ticks li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, var(--bubble-core) 0 26%, transparent 60%),
+    linear-gradient(160deg, var(--accent) 0%, var(--accent-deep) 100%);
+  box-shadow: inset 0 1px 0 var(--rim), 0 2px 6px -2px var(--shadow-deep);
+}
+
+.ticks strong {
+  color: var(--ink);
+}
+
+/* ══ Phone row ══════════════════════════════════════════════════════════════ */
+
+.phones {
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.phones figure {
+  margin: 0;
+  width: 190px;
+  flex: none;
+}
+
+.phones img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 24px;
+  border: 1px solid var(--rim);
+  box-shadow: 0 24px 50px -24px var(--shadow-deep), inset 0 1px 0 var(--rim);
+}
+
+.phones figcaption {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  text-align: center;
+  color: var(--ink-faint);
+}
+
+/* ══ Comparison strip ═══════════════════════════════════════════════════════ */
+
+.compare {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.stat {
+  padding: 20px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.stat__num {
+  display: block;
+  font-size: clamp(1.7rem, 4vw, 2.5rem);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  background: linear-gradient(160deg, var(--accent) 0%, var(--accent-deep) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.stat__label {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+/* ══ Table ══════════════════════════════════════════════════════════════════ */
+
+.table-wrap {
+  overflow-x: auto;
+  border-radius: var(--radius);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  min-width: 520px;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--hairline) 60%, transparent);
+}
+
+th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--gloss-top) 40%, transparent) 0 1px,
+    transparent 100%
+  );
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+td code {
+  font-size: 0.85em;
+}
+
+/* ══ FAQ ════════════════════════════════════════════════════════════════════ */
+
+.faq {
+  display: grid;
+  gap: 12px;
+}
+
+details.qa {
+  border-radius: var(--radius);
+  padding: 4px 20px;
+}
+
+details.qa summary {
+  cursor: pointer;
+  padding: 16px 0;
+  font-weight: 650;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+details.qa summary::-webkit-details-marker {
+  display: none;
+}
+
+details.qa summary::after {
+  content: '';
+  margin-left: auto;
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 260ms var(--ease);
+  opacity: 0.6;
+}
+
+details.qa[open] summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+
+details.qa p {
+  margin: 0 0 18px;
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+}
+
+/* ══ Install methods ════════════════════════════════════════════════════════ */
+
+.methods {
+  display: grid;
+  gap: 18px;
+  /* `minmax(0, 1fr)`, because a grid item's default `min-width: auto` lets a
+     single long unbreakable line — an install command — widen the whole track
+     and take the page with it. */
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.method {
+  padding: 22px;
+  border-radius: var(--radius-lg);
+}
+
+.method h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--accent-deep);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.method .cmd {
+  max-width: none;
+  margin-top: 12px;
+}
+
+.method p {
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+  margin-bottom: 0;
+}
+
+/* ══ Footer ═════════════════════════════════════════════════════════════════ */
+
+.footer {
+  margin-top: clamp(40px, 6vw, 72px);
+  padding: 34px 0 44px;
+  border-top: 1px solid color-mix(in srgb, var(--hairline) 60%, transparent);
+  background: color-mix(in srgb, var(--sky-low) 40%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  font-size: 0.88rem;
+  color: var(--ink-soft);
+}
+
+.footer__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px 34px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.footer a {
+  color: var(--ink-soft);
+}
+
+.footer__note {
+  max-width: 46ch;
+  margin: 0;
+}
+
+/* ══ Language switching ═════════════════════════════════════════════════════
+   Both languages are in the markup and one is hidden, so the page is fully
+   readable with JavaScript disabled and both versions are indexable. `hidden`
+   in the markup means the no-JS default is English. */
+
+html[data-lang='en'] [data-lang-block='zh'],
+html[data-lang='zh'] [data-lang-block='en'] {
+  display: none !important;
+}
+
+/* ══ Touch targets ══════════════════════════════════════════════════════════
+   A landing page has exactly four controls per viewport, so there is no reason
+   for any of them to be under 44px on a touch device. Inline links inside prose
+   are deliberately excluded — they are read, not aimed at. */
+
+@media (pointer: coarse) {
+  .lang__btn,
+  .scheme,
+  .cmd__copy,
+  .brand {
+    min-height: 44px;
+  }
+
+  .lang__btn {
+    padding-inline: 14px;
+  }
+
+  a.btn {
+    min-height: 48px;
+  }
+}
+
+/* ══ Small screens ══════════════════════════════════════════════════════════ */
+
+/* At 400px the wordmark is the first thing that has to go: the droplet alone
+   still identifies the page, and the controls stay reachable. */
+@media (max-width: 400px) {
+  .brand__name {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 15px;
+  }
+
+  .header__sub {
+    display: none;
+  }
+
+  .brand__sub {
+    display: none;
+  }
+
+  .header__inner {
+    gap: 10px;
+  }
+
+  .cta .btn {
+    width: 100%;
+  }
+
+  .cta {
+    gap: 10px;
+  }
+
+  .header__gh {
+    display: none;
+  }
+
+  .cmd {
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  /* Wrapping beats truncation here. The command is the one thing a visitor has
+     to read exactly, and a horizontally scrollable one-liner that ends in an
+     ellipsis is the fastest way to make them copy the wrong thing. */
+  .cmd code {
+    width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .cmd__copy {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .scene__bubble {
+    opacity: 0.35;
+    bottom: auto;
+    top: calc(12% + var(--lift, 0vh) * 3.4);
+    transform: none;
+  }
+}

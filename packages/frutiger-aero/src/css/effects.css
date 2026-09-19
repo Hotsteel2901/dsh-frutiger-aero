@@ -1,0 +1,242 @@
+/*
+ * effects.css — the animation tier.
+ *
+ * Everything here is additive polish, which means everything here is also the
+ * first thing that may be dropped. Three rules keep it from becoming a tax:
+ *
+ *   1. **Only `transform` and `opacity`.** No width, height, top, filter,
+ *      box-shadow or background-position animation anywhere in this file —
+ *      those force layout, paint or a filter re-run on the main thread, and a
+ *      chat transcript is a bad place to be spending main-thread time.
+ *   2. **Entrances only on things that mount once.** Dialogs, menus and
+ *      popovers appear because the user asked for them. Message rows are
+ *      deliberately *not* animated: the transcript virtualises, so a row
+ *      re-animates every time it scrolls back into view, which reads as a
+ *      glitch rather than as polish.
+ *   3. **Nothing watches the transcript.** No `:has()` selector is anchored on
+ *      something that changes while the model streams; a document-wide
+ *      re-match per token is a real cost, and it would be invisible to the
+ *      person paying it.
+ *
+ * The press ring and hover sheen use `::before`/`::after` on interactive
+ * elements. That is safe here specifically because the product defines no
+ * pseudo-element on `button` at all — verified against its bundled CSS — so
+ * there is nothing to displace.
+ */
+
+/* ══ Floating surfaces: the Aero spring ═════════════════════════════════════
+   A short overshoot on Y plus a scale from 0.96 — enough to feel like the pane
+   was *placed* rather than having always been there. */
+
+[role="dialog"],
+[role="menu"],
+[role="listbox"],
+[role="tooltip"],
+[data-tip] {
+  /* `backwards`, never `both`: a forwards-filling animation outranks *inline*
+     styles for the properties it animates, so `both` would permanently pin
+     `transform` on any menu the product positions with a transform of its own.
+     `backwards` still holds the entrance state through the first frame. */
+  animation: fa-surface-in 240ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+  transform-origin: var(--fa-origin, 50% 0%);
+}
+
+/* A tooltip has no user-initiated delay; it should arrive, not perform. */
+[role="tooltip"],
+[data-tip] {
+  animation-duration: 140ms;
+}
+
+[role="status"] {
+  animation: fa-toast-in 300ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+}
+
+@keyframes fa-surface-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes fa-toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* ══ The boot card ══════════════════════════════════════════════════════════
+   The first frame the theme owns: a short rise on the card, and a glow behind
+   the product's own spinner so the wait belongs to the theme too. */
+
+[data-dsh-boot] > * {
+  animation: fa-boot-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+[data-dsh-boot-spinner] {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--dsw-alias-state-business-primary) 40%, transparent);
+}
+
+@keyframes fa-boot-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* ══ The press acknowledgement ══════════════════════════════════════════════
+   A one-shot ring that expands and fades from the control's centre. Driven by
+   `:active` rather than by JavaScript, so it costs nothing when idle; and
+   because it is `transform`/`opacity` it never repaints the control it is drawn
+   on. The haptic that accompanies it lives in runtime.js. */
+
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]) {
+  position: relative;
+}
+
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(:disabled)::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
+  transform: scale(0.82);
+}
+
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(:disabled):active::after {
+  animation: fa-press-ring 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fa-press-ring {
+  0% {
+    opacity: 0.75;
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.14);
+  }
+}
+
+/* ══ The hover sheen ════════════════════════════════════════════════════════
+   Fine pointers only, and expressed as `opacity` on a pseudo-element rather
+   than as a `background-position` animation: a sweep that repaints a button is
+   fine on one element and a problem in a sixty-button toolbar. */
+
+@media (hover: hover) and (pointer: fine) {
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(:disabled)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 30%,
+      color-mix(in srgb, var(--fa-gloss-top) 42%, transparent) 48%,
+      transparent 66%
+    );
+    transition: opacity 260ms ease;
+  }
+
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not(:disabled):hover::before {
+    opacity: 1;
+  }
+
+  /* Sidebar rows get a wider version: they are large, they are the main
+     navigation, and the sheen is what makes them read as glass. */
+  [data-fa-col="sidebar"] :is(button, [role="button"])::before {
+    background: linear-gradient(
+      100deg,
+      transparent 18%,
+      color-mix(in srgb, var(--fa-gloss-top) 34%, transparent) 46%,
+      transparent 74%
+    );
+  }
+}
+
+/* ══ The active navigation item ═════════════════════════════════════════════
+   Aero's "lit lens": the selected row carries its own light source, so it is
+   drawn with an aqua bloom behind it on top of the product's own active fill. */
+
+[data-fa-col="sidebar"] :is([data-active], [aria-current="page"], [data-selected]) {
+  box-shadow:
+    inset 0 1px 0 var(--fa-rim-light),
+    inset 0 0 18px -6px var(--fa-inner-glow),
+    0 1px 3px -1px var(--dsw-alias-bg-mask-2) !important;
+}
+
+/* ══ The dock's arrival ═════════════════════════════════════════════════════
+   An entrance, not a loop. The obvious flourish here is a slow idle float, and
+   it was the first thing tried — then removed, for two reasons that matter more
+   than the effect did. A primary navigation target that never stops moving
+   moves *under the user's thumb*, and a permanently animating element keeps the
+   compositor awake for the entire life of the page. A one-shot settle keeps the
+   polish and costs nothing after 420ms. */
+
+@media (pointer: coarse) and (max-width: 640px) {
+  html.fa-tier-full [data-fa-dock],
+  html.fa-tier-lite [data-fa-dock] {
+    animation: fa-dock-arrive 420ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+  }
+}
+
+@keyframes fa-dock-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 26px, 0) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(-50%, 0, 0) scale(1);
+  }
+}
+
+/* ══ Prohibited below the full tier ═════════════════════════════════════════
+   The `lite` tier keeps the palette, the material and the mobile layout, and
+   drops every *decorative* animation. The tier classes are on `<html>`; the
+   wallpaper's own loops are gated separately, in scenery.css. */
+
+html.fa-tier-lite :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])::after,
+html.fa-tier-off :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])::after {
+  display: none;
+}
+
+html.fa-tier-off :is([role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"], [data-tip], [role="status"]) {
+  animation: none !important;
+}
+
+/* A background tab has no business compositing a wallpaper, and some engines
+   keep doing it. This is the only global animation rule in the plugin. */
+html[data-fa-idle] * {
+  animation-play-state: paused !important;
+}
+
+/* ══ Reduced motion ═════════════════════════════════════════════════════════
+   The user's own setting beats every tier decision above. */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

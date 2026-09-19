@@ -1,0 +1,17 @@
+# The dsh-frutiger-aero bundle patch.
+#
+# One row, appended to the profile's root entry list. The row's `name` is this
+# package, so Loader imports lib/index.js from the profile's node_modules; the
+# host half is deliberately empty. The row exists for what its *manifest*
+# declares: `dsh.client`, which makes the client-modules scan put
+# lib/client.js into window.__DSH_BOOT__ as a browser plugin row.
+#
+# The whole skin therefore lives in the browser half. Nothing here touches the
+# host: no service is provided, no tool is registered, no config is read.
+#
+# A profile's own cordis.patch.yml is applied after every bundle layer, so
+# `- id: frutiger-aero` there can disable or reconfigure this row:
+
+- insert:
+    - id: frutiger-aero
+      name: dsh-frutiger-aero

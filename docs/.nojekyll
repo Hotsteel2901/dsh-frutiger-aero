@@ -1,0 +1,3 @@
+# Keep GitHub Pages from running the docs directory through Jekyll: there is
+# nothing to process here, and Jekyll would ignore files starting with an
+# underscore and add a build step to a page that is already finished.

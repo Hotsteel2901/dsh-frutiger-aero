@@ -1,0 +1,447 @@
+/*
+ * material.css — the glass itself.
+ *
+ * ## Why `!important` is used deliberately here
+ *
+ * A client plugin's stylesheet is injected at runtime, and the boot creates
+ * every plugin entry concurrently, so there is no guaranteed order between this
+ * sheet and the product's own CSS-module sheets. Specificity ties cannot be
+ * won by document order, and the product's rules are class selectors, so an
+ * attribute selector of the same weight is a coin flip. Every paint property
+ * below is therefore `!important`, which is what makes the skin deterministic
+ * rather than load-order dependent.
+ *
+ * That is only safe because of what is *not* overridden. The product encodes
+ * meaning in exactly one paint property — `background-color`, where a danger
+ * button is red and a success chip is green — and this file never sets
+ * `background-color`. It sets `background-image` (the Aero gloss, layered on
+ * top of whatever colour the product chose), `border-*`, `border-radius`,
+ * `box-shadow`, `backdrop-filter` and `color` inherited from the palette. So a
+ * red button stays red, and it becomes a *glossy* red button.
+ *
+ * ## Why stable attributes, not class names
+ *
+ * The product hashes CSS-module class names per build (`.pI_x6G_sidebarCol`),
+ * so they are worthless as selectors across an upgrade. What it *does* keep
+ * stable is the semantic `data-*` vocabulary its own styles and tests depend
+ * on — `data-rightbar-col`, `data-shell-overlay`, `data-conversation-scroll`,
+ * `data-composer-card`, `data-chat-flow-kind`, `data-files-row` — plus ARIA
+ * roles and element semantics. This file is written almost entirely against
+ * those, which is why it survives product upgrades.
+ */
+
+/* ══ 1. The glass panes ═════════════════════════════════════════════════════
+   Aero is a *window*: a bright rim, a translucent pane, and a soft coloured
+   glow behind it. The frame is the window; the sidebar, right panel and
+   composer are the panes set into it.
+
+   The single most important rule in the whole skin is the frame being
+   transparent: the wallpaper sits behind it, and one wash of
+   `--dsw-alias-bg-base` (78% white in light, 84% deep water in dark) is all
+   that separates the user's text from the scene. */
+
+[data-fa-frame] {
+  background: transparent !important;
+}
+
+/* The left rail / sidebar. Warmer and lighter than the content pane so the
+   window reads as chrome plus paper. */
+[data-fa-col="sidebar"] {
+  background: var(--dsw-specific-sidebar-fill) !important;
+  border-right: 1px solid var(--dsw-alias-border-l2) !important;
+  box-shadow:
+    inset -1px 0 0 var(--fa-rim-light),
+    inset 1px 0 0 color-mix(in srgb, var(--fa-gloss-top) 30%, transparent) !important;
+}
+
+/*
+ * The right panel deliberately gets the *heavier* glass: it is a floating
+ * surface, not a structural column.
+ *
+ * It is applied to the **panel**, never to the column, and that distinction is
+ * load-bearing rather than stylistic. On desktop the column is a zero-width
+ * grid track, so blurring it is free; once the frame collapses to a single
+ * track it spans the entire viewport — and a `backdrop-filter` on it then blurs
+ * and desaturates the *whole application*, with the transcript inside it.
+ *
+ * It is also invisible to the obvious checks: the column is
+ * `pointer-events: none`, so `elementFromPoint` never returns it and hit
+ * testing looks perfectly healthy. It only shows up in pixels: on a phone at
+ * the `full` tier the transcript band measured a luminance standard deviation
+ * of 7 where the same content measured 26 with this rule scoped correctly.
+ */
+[data-sidebar-right-panel] {
+  backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+  -webkit-backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+}
+
+/* The column may carry the glass only where it is a real, narrow track. */
+@media (min-width: 1024px) {
+  [data-fa-col="rightbar"] {
+    backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+    -webkit-backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+  }
+}
+
+/* A column must never filter the viewport it shares with the conversation. */
+@media (max-width: 1023px) {
+  [data-fa-col="rightbar"] {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+html.fa-tier-lite [data-fa-col="rightbar"],
+html.fa-tier-lite [data-sidebar-right-panel],
+html.fa-tier-lite [data-fa-col="sidebar"],
+html.fa-tier-off [data-fa-col="rightbar"],
+html.fa-tier-off [data-sidebar-right-panel],
+html.fa-tier-off [data-fa-col="sidebar"] {
+  /* Type-A surfaces: tint only. A full-height blur that has an animated
+     wallpaper behind it is re-run on every frame the wallpaper moves, which is
+     the one place this design could actually cost a phone its scroll. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/*
+ * The conversation column keeps the product's own `--dsw-alias-bg-base` wash —
+ * stripping it was the first thing tried here, and it is wrong: without a
+ * column-level pane the wallpaper showed *through the gaps between rows*, so a
+ * tool-call row over the hills went green and the empty half of a wide
+ * transcript went bright blue. One uniform wash is what turns a wallpaper into
+ * a background.
+ *
+ * What the tag is still for is the second, softer pane: a gradient that is
+ * brightest behind the header and fades out down the transcript, so the top of
+ * the column reads as lit glass without dimming the reading surface below it.
+ */
+[data-fa-canvas] {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-pane-strong) 46%, transparent) 0%,
+    transparent 34%
+  ) !important;
+}
+
+/* ══ 2. The composer ════════════════════════════════════════════════════════
+   The composer is the one surface the user touches constantly, so it gets the
+   most Aero: a real frosted pane with a bright rim, an inner aqua glow on
+   focus, and a lift on press. The product already gives it a 22px radius and
+   `--dsw-elevation-soft`, both of which the palette has already retinted. */
+
+[data-composer-card] {
+  background: var(--dsw-specific-input-major) !important;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 55%, transparent) 0 1px,
+    color-mix(in srgb, var(--fa-gloss-mid) 40%, transparent) 1px,
+    transparent 42%,
+    color-mix(in srgb, var(--fa-gloss-foot) 26%, transparent) 100%
+  ) !important;
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  box-shadow:
+    var(--dsw-elevation-soft),
+    inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 40%, transparent),
+    inset 0 -14px 28px -18px var(--fa-inner-glow) !important;
+  backdrop-filter: blur(var(--fa-blur)) saturate(var(--fa-saturate));
+  -webkit-backdrop-filter: blur(var(--fa-blur)) saturate(var(--fa-saturate));
+  transition:
+    box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 220ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-composer-card]:focus-within {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 62%, transparent) !important;
+  box-shadow:
+    var(--dsw-elevation-prominent),
+    0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 55%, transparent),
+    inset 0 -18px 34px -20px var(--fa-inner-glow) !important;
+}
+
+html.fa-tier-lite [data-composer-card],
+html.fa-tier-off [data-composer-card] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The editor inside the composer is transparent; the pane above it is the
+   surface. Only the placeholder is restyled, to Aero's lighter ink. */
+[data-composer-placeholder],
+[data-placeholder] {
+  color: var(--dsw-alias-label-tertiary) !important;
+}
+
+[data-composer-chip] {
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-2) 70%, transparent) !important;
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  border-radius: 999px !important;
+}
+
+/* ══ 3. Interactive surfaces ════════════════════════════════════════════════
+   One gloss recipe, applied to everything the user can press. Written as a
+   five-stop vertical gradient rather than a `::after` overlay: a pseudo-element
+   would need `position: relative` and `overflow: hidden` on every control,
+   which is exactly the kind of layout meddling a reskin must not do.
+
+   Stops, top to bottom:
+     0→1px   a crisp bright rim      (the "specular" edge)
+     1px→46% a soft sheen            (the gloss)
+     46%→54% the specular break      (where the curve turns away from the light)
+     54%→98% a faint reflected floor (the light bouncing off the surface below)
+     98%→100% a second, dimmer rim   (the bottom edge catching light) */
+
+:is(
+    button,
+    [role="button"],
+    [role="tab"],
+    [role="menuitem"],
+    [role="menuitemradio"],
+    [role="menuitemcheckbox"],
+    [role="option"],
+    summary,
+    a[href]
+  ):not([data-fa-plain]) {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 62%, transparent) 0 1px,
+    color-mix(in srgb, var(--fa-gloss-mid) 30%, transparent) 1px,
+    transparent 46%,
+    transparent 54%,
+    color-mix(in srgb, var(--fa-gloss-foot) 16%, transparent) 98%,
+    color-mix(in srgb, var(--fa-gloss-top) 30%, transparent) 100%
+  ) !important;
+}
+
+/* Hover and press. Both are expressed as the same gradient with different
+   opacities, so the "material" never changes — only how much light is on it. */
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary):not(:disabled):hover {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 78%, transparent) 0 1px,
+    color-mix(in srgb, var(--fa-gloss-mid) 46%, transparent) 1px,
+    transparent 50%,
+    color-mix(in srgb, var(--fa-gloss-foot) 24%, transparent) 100%
+  ) !important;
+}
+
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary):not(:disabled):active {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 0 2px,
+    transparent 30%,
+    color-mix(in srgb, var(--fa-gloss-foot) 30%, transparent) 100%
+  ) !important;
+}
+
+/* Disabled controls lose their gloss rather than being dimmed *and* shiny,
+   which would read as still-interactive. */
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):disabled,
+:is(button, [role="button"]):is([aria-disabled="true"]) {
+  background-image: none !important;
+  filter: saturate(0.85);
+}
+
+/* Focus is the product's `outline`, which this file has not touched; it only
+   gets the Aero aqua and a soft halo so it sits in the new palette. */
+:focus-visible {
+  outline-color: var(--dsw-alias-state-business-primary) !important;
+}
+
+/* ══ 4. Inputs and editors ══════════════════════════════════════════════════
+   Text fields become inset glass wells: the gradient runs the other way (dark
+   at the top) because an inset surface is lit from *inside* the rim. */
+
+:is(input, textarea, select, [contenteditable="true"], [data-lexical-editor]):not([data-composer-input]):not(
+    [data-fa-plain]
+  ) {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-mask-2) 60%, transparent) 0 1px,
+    transparent 26%,
+    color-mix(in srgb, var(--fa-gloss-foot) 14%, transparent) 100%
+  ) !important;
+  border: 1px solid var(--dsw-alias-border-l2) !important;
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--dsw-alias-bg-mask-2) 70%, transparent) !important;
+}
+
+:is(input, textarea, select):focus {
+  border-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 60%, transparent) !important;
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--dsw-alias-bg-mask-2) 60%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 16%, transparent) !important;
+}
+
+::placeholder {
+  color: var(--dsw-alias-label-tertiary);
+  opacity: 1;
+}
+
+/* The product's own selection colour follows `--dsw-alias-brand-primary`, which
+   the palette has already turned aqua; this only adds the translucent wash Aero
+   uses so text under a selection stays legible. */
+::selection {
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 26%, transparent);
+}
+
+/* ══ 5. Floating surfaces ═══════════════════════════════════════════════════
+   Dialogs, menus and tooltips are the moment the glass metaphor has to be
+   convincing, because they float *over* content with nothing structural
+   holding them. Heavy blur, a bright rim and a deep coloured shadow do it. */
+
+[role="dialog"],
+dialog {
+  background: var(--dsw-specific-menu) !important;
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  box-shadow:
+    var(--dsw-elevation-prominent),
+    inset 0 1px 0 var(--fa-rim-light),
+    inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 30%, transparent) !important;
+  backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+  -webkit-backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+}
+
+[role="menu"],
+[role="listbox"],
+[role="tooltip"],
+[role="grid"],
+[data-tip] {
+  background: var(--dsw-specific-menu) !important;
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  box-shadow:
+    var(--dsw-elevation-panel),
+    inset 0 1px 0 var(--fa-rim-light) !important;
+  backdrop-filter: blur(var(--fa-blur)) saturate(var(--fa-saturate));
+  -webkit-backdrop-filter: blur(var(--fa-blur)) saturate(var(--fa-saturate));
+}
+
+[role="tooltip"] {
+  background: var(--dsw-alias-tooltip-bg) !important;
+  color: var(--fa-tooltip-ink, var(--dsw-alias-label-primary-foreground)) !important;
+}
+
+html.fa-tier-lite :is([role="dialog"], dialog, [role="menu"], [role="listbox"], [role="tooltip"], [data-tip]),
+html.fa-tier-off :is([role="dialog"], dialog, [role="menu"], [role="listbox"], [role="tooltip"], [data-tip]) {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* The overlay layer holds full-screen scrims; the frame's own scene is the
+   backdrop, so the scrim only has to deepen contrast, not hide anything. */
+[data-shell-overlay] {
+  background: transparent !important;
+}
+
+/* ══ 6. Content ═════════════════════════════════════════════════════════════
+   Code, tables and quotes are where a themed app usually starts to look wrong,
+   because they are the surfaces most likely to have hard-coded neutrals. The
+   palette has already retinted their tokens; these rules finish the material. */
+
+[data-code-block-content],
+pre {
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fa-rim-light) 34%, transparent) !important;
+}
+
+code,
+kbd {
+  border-radius: 6px;
+}
+
+kbd {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 60%, transparent) 0 1px,
+    transparent 60%,
+    color-mix(in srgb, var(--fa-gloss-foot) 24%, transparent) 100%
+  ) !important;
+  box-shadow:
+    0 1px 0 color-mix(in srgb, var(--dsw-alias-bg-mask-2) 70%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 40%, transparent) !important;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 40%, transparent) 0 1px,
+    transparent 100%
+  ) !important;
+}
+
+blockquote {
+  border-left: 3px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 50%, transparent) !important;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 55%, transparent);
+  border-radius: 0 12px 12px 0;
+}
+
+hr {
+  border-color: var(--dsw-alias-border-l2) !important;
+}
+
+/* ══ 7. Chrome ══════════════════════════════════════════════════════════════
+   Scrollbars become aqua pills with a gloss, which is a small detail that does
+   a surprising amount of the "this is a different product" work. */
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px !important;
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 55%, transparent) 0 1px,
+    transparent 70%
+  ) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 24%, transparent);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 70%, transparent) 0 1px,
+    transparent 70%
+  ) !important;
+}
+
+/* Skeleton shimmer. The product animates these already; this only recolours
+   them to the aqua ramp so loading states belong to the theme. */
+[data-loading],
+[data-document-loading] {
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--fa-gloss-top) 42%, transparent) 42%,
+    transparent 64%
+  ) !important;
+  background-size: 220% 100% !important;
+  animation: fa-shimmer 1.5s linear infinite;
+}
+
+/* The boot card, which is the very first thing the theme has to own. */
+[data-dsh-boot] {
+  background: transparent !important;
+}
+
+[data-dsh-boot] > * {
+  background: var(--dsw-alias-bg-layer-3) !important;
+  border: 1px solid var(--dsw-alias-border-l1) !important;
+  border-radius: var(--fa-radius-lg) !important;
+  padding: 28px 36px !important;
+  box-shadow:
+    var(--dsw-elevation-prominent),
+    inset 0 1px 0 var(--fa-rim-light) !important;
+  backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+  -webkit-backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+}
+
+@keyframes fa-shimmer {
+  0% {
+    background-position: 160% 0;
+  }
+  100% {
+    background-position: -60% 0;
+  }
+}

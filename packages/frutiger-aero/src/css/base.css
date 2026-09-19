@@ -1,0 +1,105 @@
+/*
+ * base.css — structural groundwork.
+ *
+ * Loaded after the generated palette sheet and before everything else, so this
+ * file may assume every `--dsw-*` token and every `--fa-*` material variable
+ * already resolves, and must not assume any of the plugin's own attributes
+ * exist yet (the tagger runs after the first paint).
+ *
+ * The rules here answer one question: *where does the wallpaper live?* The
+ * scene is appended to `<body>` as a fixed element, so `#root` has to be lifted
+ * into its own stacking context above it. Everything else in the skin depends
+ * on that one decision.
+ */
+
+html {
+  /* Aero is a bright, slightly cool white. This is what shows through before
+     the scene mounts, and behind it afterwards, so the first paint already
+     belongs to the theme instead of flashing the product default. The value
+     comes from the generated palette sheet, which also flips it for the dark
+     scheme. */
+  background: var(--fa-root-bg, #dff2fd);
+  /* The software keyboard is handled by a custom property (see runtime.js), so
+     the page itself must never resize under the user's thumb. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  background: transparent !important;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family);
+  /* Momentum scrolling and rubber-banding are opt-in per scroll container in
+     mobile.css; the page shell itself must not bounce. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * The wallpaper is a negative-z-index fixed layer, the classic technique: it
+ * paints above the canvas background and below every in-flow node, without
+ * giving `#root` a stacking context of its own.
+ *
+ * That last part matters. Wrapping the app in a stacking context would cap the
+ * product's internal z-index ladder — panels at 8, handles at 11, the overlay
+ * layer at 20, portalled dialogs at 100 — so a dock or a scrim placed as a
+ * sibling of `#root` could never be layered correctly against a dialog. Leaving
+ * `#root` context-free lets every layer compete in one space, which is exactly
+ * what the mobile layer needs.
+ */
+body > [data-fa-scene] {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+
+/* The app's own full-viewport surface must not paint over the wallpaper; the
+   single translucent wash comes from `--dsw-alias-bg-base` instead, which keeps
+   exactly one layer of translucency between the scene and the content. */
+[data-fa-frame] {
+  background: transparent !important;
+}
+
+/* The conversation column keeps its own `--dsw-alias-bg-base` wash; see the
+   note on `[data-fa-canvas]` in material.css for why stripping it is wrong. */
+
+/*
+ * Anything the plugin adds is decoration and must never eat a pointer event.
+ * The scrim is the single exception, and only while a drawer is open.
+ */
+[data-fa-scene],
+[data-fa-scrim] {
+  pointer-events: none;
+}
+
+body[data-fa-drawer] > [data-fa-scrim] {
+  pointer-events: auto;
+  /* The scrim is what stops the page behind the drawer from scrolling: every
+     touch that would have reached the transcript lands here instead. */
+  touch-action: none;
+}
+
+html {
+  /* Published by the keyboard tracker; zero on every platform without a
+     software keyboard, so the expression is safe everywhere. */
+  --fa-keyboard: 0px;
+  --fa-dock-height: 58px;
+
+  /* Dock glyphs. Inline SVG masks rather than icon fonts or sprite requests:
+     they inherit `currentColor`, cost no network round trip, and are defined
+     once for the single place this plugin draws its own iconography. */
+  --fa-icon-menu: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h10'/%3E%3C/svg%3E");
+  --fa-icon-new: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E");
+  --fa-icon-search: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='6.5'/%3E%3Cpath d='M16 16l4.5 4.5'/%3E%3C/svg%3E");
+  --fa-icon-library: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.5h7A1.5 1.5 0 0 1 19 10v7a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 3 17z'/%3E%3C/svg%3E");
+  /* Sliders rather than a cog: at 22px a cog's teeth are indistinguishable
+     from a sunburst, and the dock already has a sun-like element behind it. */
+  --fa-icon-settings: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h10M18 7h2M4 17h4M12 17h8'/%3E%3Ccircle cx='16' cy='7' r='2.2'/%3E%3Ccircle cx='10' cy='17' r='2.2'/%3E%3C/svg%3E");
+}
+
+/* Reduced motion is honoured in one place for everything decorative. */
+@media (prefers-reduced-motion: reduce) {
+  html.fa-tier-full [data-fa-scene]::after {
+    display: none;
+  }
+}

@@ -1,0 +1,30 @@
+name: Feature request
+description: Something the skin or the mobile layout should do.
+title: '[feat] '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do that is awkward or impossible today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you have in mind
+    validations:
+      required: false
+
+  - type: markdown
+    attributes:
+      value: |
+        Two constraints shape what is possible here, and knowing them up front
+        saves a round trip:
+
+        - the plugin may only **paint**. It does not manage state, wrap
+          components or replace handlers;
+        - every effect it adds has to be releasable through `ctx.effect`, so it
+          disappears cleanly when the row is disabled.

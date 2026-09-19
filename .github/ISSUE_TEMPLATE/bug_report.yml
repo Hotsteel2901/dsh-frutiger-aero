@@ -1,0 +1,75 @@
+name: Bug report
+description: Something looks wrong, or something stopped working.
+title: '[bug] '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. The three fields below are the ones that turn a
+        report into a fix; everything else is optional.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you see, and what you expected instead.
+    validations:
+      required: true
+
+  - type: input
+    id: surface
+    attributes:
+      label: Where
+      description: Desktop, tablet or phone — and roughly what window size, if it is a layout problem.
+      placeholder: 'e.g. iPhone 13, Safari, portrait'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scheme
+    attributes:
+      label: Colour scheme
+      options:
+        - Light
+        - Dark
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: tier
+    attributes:
+      label: Tier
+      description: |
+        Run `window.__FRUTIGER__.tier()` in the browser console and paste the result.
+        If the plugin is not installed at all, say so.
+      placeholder: 'full | lite | off'
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+        3. …
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: Any errors from the browser console or the `dsh` process.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: I tried `?frutiger=off` — the problem goes away with the skin disabled.
+        - label: I am not running another theme or skin plugin at the same time.

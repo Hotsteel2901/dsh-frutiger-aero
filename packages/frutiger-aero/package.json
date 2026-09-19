@@ -1,0 +1,66 @@
+{
+  "name": "dsh-frutiger-aero",
+  "version": "1.0.0",
+  "description": "Frutiger Aero skin for the DeepSeek Harness Web UI: frosted glass over a living sky-and-water wallpaper, aqua gloss on every control, light and dark schemes built on the product's own token graph — plus a rebuilt narrow-viewport layout with an overlay drawer, a thumb-reachable dock and a keyboard-aware composer.",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "src",
+    "build.mjs",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "dsh-web",
+    "cordis",
+    "cordis-plugin",
+    "theme",
+    "skin",
+    "frutiger-aero",
+    "aero",
+    "glassmorphism",
+    "frosted-glass",
+    "web-ui",
+    "ui-theme",
+    "dark-mode",
+    "mobile",
+    "responsive",
+    "touch"
+  ],
+  "homepage": "https://Hotsteel2901.github.io/dsh-frutiger-aero/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hotsteel2901/dsh-frutiger-aero.git",
+    "directory": "packages/frutiger-aero"
+  },
+  "bugs": {
+    "url": "https://github.com/Hotsteel2901/dsh-frutiger-aero/issues"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-theme"
+      ],
+      "immediately": true
+    }
+  }
+}

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: dsh-plugin topic
+    url: https://github.com/topics/dsh-plugin
+    about: Other plugins for DeepSeek Harness.
+  - name: DeepSeek Harness
+    url: https://github.com/deepseek-ai/deepseek-harness
+    about: The host application itself — bugs in dsh belong here, not in this plugin.

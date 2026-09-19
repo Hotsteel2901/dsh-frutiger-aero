@@ -1,0 +1,452 @@
+/*
+ * mobile.css — the phone and tablet layout.
+ *
+ * The stock narrow layout *squeezes*: below 1024px the sidebar stays in the
+ * grid, so a 390px phone gives 56px to an icon rail and 334px to the thing the
+ * user is actually reading. That is the one place this reskin changes behaviour
+ * rather than appearance, and it is the change that matters most.
+ *
+ * The model, in three breakpoints:
+ *
+ *   ≥ 1024px  stock three-column desktop layout, untouched.
+ *   641–1023  the frame collapses to a single column and the sidebar becomes an
+ *             overlay drawer: a 56px rail when closed (the tablet keeps its
+ *             navigation) and a 330px pane that slides *over* the content when
+ *             opened, instead of stealing width from it.
+ *   ≤ 640px   the rail goes fully off-canvas, the content gets the entire
+ *             viewport, and the primary navigation moves to a floating bottom
+ *             dock where a thumb can reach it.
+ *
+ * Only `transform`, `width` and the safe-area paddings are animated or
+ * expressed here, and every transition is disabled under
+ * `prefers-reduced-motion` — the layout is help, not decoration, so it applies
+ * at every tier.
+ */
+
+/* ══ Narrow: one column, the sidebar floats over it ═════════════════════════ */
+
+@media (max-width: 1023px) {
+  /*
+   * The inline `grid-template-columns` React writes is the stock layout's whole
+   * mechanism, and it has to go: a single track is what lets the sidebar leave
+   * the flow and become a drawer. `!important` beats the inline style, which is
+   * the only way to override a value React re-writes on every drag frame.
+   */
+  [data-fa-frame] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  /*
+   * Both remaining columns share the single track, so the drawer can overlay
+   * either of them without either having to be re-measured.
+   *
+   * Sharing a cell has a consequence that is easy to miss and was, in the first
+   * version of this file: grid items in the same cell stack in DOM order, and
+   * the right column comes *after* the centre — so a full-size, empty right
+   * column sat on top of the transcript and swallowed every tap and every
+   * scroll gesture aimed at it. `elementFromPoint` at the centre of a
+   * conversation row returned the right column, and because a touch scroll is
+   * routed through the touched element's scrollable ancestor, the transcript
+   * could not be scrolled by touch at all.
+   *
+   * The fix is to take the right column out of hit testing entirely and hand
+   * pointer events back only to its own content. When no panel is shown its
+   * children are zero-sized, so nothing is blocked; when a panel *is* shown it
+   * is a child, so it stays fully interactive — including the full-screen file
+   * preview, where the panel is the only thing on screen.
+   */
+  [data-fa-col="center"] {
+    grid-area: 1 / 1 / 2 / -1 !important;
+    z-index: 2;
+  }
+
+  [data-fa-col="rightbar"] {
+    grid-area: 1 / 1 / 2 / -1 !important;
+    /* Above the centre, because a panel is positioned against this column's
+       right edge and is meant to hang over the conversation. */
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  [data-fa-col="rightbar"] > * {
+    pointer-events: auto;
+  }
+
+  [data-fa-col="sidebar"] {
+    position: absolute !important;
+    inset: 0 auto 0 0;
+    z-index: 30;
+    width: min(84vw, 330px) !important;
+    max-width: calc(100vw - 56px);
+    /* The drawer runs under the notch in landscape and stops above the home
+       indicator in portrait. */
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    /* Matches the frame's own column transition, so opening the drawer and
+       resizing a desktop column feel like the same motion. */
+    transition: width var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    /* A drawer needs to read as being *in front of* the page, which a hairline
+       border cannot do. */
+    box-shadow:
+      0 0 0 1px var(--dsw-alias-border-l1),
+      18px 0 46px -22px var(--dsw-alias-bg-mask-3),
+      inset -1px 0 0 var(--fa-rim-light) !important;
+  }
+
+  /* Closed on a tablet: the rail stays, 56px of it, exactly as wide as the
+     product's own collapsed column. */
+  [data-fa-frame][data-sidebar-collapsed] [data-fa-col="sidebar"] {
+    width: 56px !important;
+    box-shadow: none !important;
+  }
+
+  /* The content keeps clear of the rail while it is a rail, and reclaims the
+     full width the moment the drawer opens over it. */
+  [data-fa-col="center"] {
+    padding-left: 56px !important;
+  }
+
+  [data-fa-frame]:not([data-sidebar-collapsed]) [data-fa-col="center"] {
+    padding-left: 0 !important;
+  }
+
+  /* Full-screen panels on a narrow viewport are the real content, so they sit
+     above the drawer rather than being covered by it. */
+  [data-fa-frame][data-rightbar-fullscreen] [data-fa-col="rightbar"] {
+    z-index: 34;
+  }
+}
+
+/* ══ The scrim ══════════════════════════════════════════════════════════════ */
+
+[data-fa-scrim] {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  opacity: 0;
+  background:
+    radial-gradient(120% 80% at 0% 50%, color-mix(in srgb, var(--fa-water-deep) 26%, transparent) 0%, transparent 70%),
+    var(--dsw-alias-bg-mask-2);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition: opacity 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+body[data-fa-drawer] [data-fa-scrim] {
+  opacity: 1;
+}
+
+/* ══ Phone: the rail goes off-canvas ════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+  [data-fa-col="sidebar"] {
+    width: min(84vw, 320px) !important;
+    transition: transform 340ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Off-canvas, not display:none — the drawer's controls stay in the DOM (the
+     dock clicks them), and `visibility` keeps them out of the tab order while
+     it is closed. */
+  [data-fa-frame][data-sidebar-collapsed] [data-fa-col="sidebar"] {
+    width: min(84vw, 320px) !important;
+    transform: translate3d(-102%, 0, 0);
+    visibility: hidden;
+    transition:
+      transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+      visibility 340ms;
+  }
+
+  [data-fa-col="center"] {
+    padding-left: 0 !important;
+  }
+
+  /* Room for the dock, so the composer is never underneath it. Applied to the
+     column rather than the scroll area because the transcript measures itself
+     against a composer it expects at the very bottom of the column. */
+  [data-fa-frame] [data-fa-col="center"] {
+    box-sizing: border-box !important;
+    padding-bottom: calc(var(--fa-dock-height) + env(safe-area-inset-bottom, 0px) + 10px) !important;
+  }
+
+  /* While the software keyboard is up the dock is in the way and the composer
+     is the only thing that matters. */
+  body[data-fa-keyboard] [data-fa-dock] {
+    transform: translate3d(-50%, 160%, 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /*
+   * The right panel is a full-screen surface on a phone — a file preview, a
+   * diff, a document. The dock stays (session navigation is still useful while
+   * reading), but the panel has to stop *above* it, or the last lines of the
+   * file are behind a floating bar with no way to scroll them into view.
+   *
+   * Padding the panel rather than the dock is deliberate: the dock's own
+   * geometry is what every other rule here is expressed against, and shrinking
+   * the panel's content box is the only change that cannot move anything else.
+   */
+  [data-fa-col="rightbar"] [data-sidebar-right-panel] {
+    box-sizing: border-box !important;
+    padding-bottom: calc(var(--fa-dock-height) + env(safe-area-inset-bottom, 0px) + 12px) !important;
+  }
+}
+
+/* Landscape phones: no vertical budget for a dock. */
+@media (max-width: 900px) and (max-height: 460px) and (orientation: landscape) {
+  [data-fa-dock] {
+    display: none !important;
+  }
+
+  [data-fa-frame] [data-fa-col="center"] {
+    padding-bottom: 0 !important;
+  }
+
+  [data-fa-col="sidebar"] {
+    width: min(62vw, 300px) !important;
+  }
+}
+
+/* ══ The bottom dock ════════════════════════════════════════════════════════ */
+
+[data-fa-dock] {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  [data-fa-dock] {
+    position: fixed;
+    left: 50%;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 45;
+    display: flex;
+    gap: 2px;
+    align-items: stretch;
+    padding: 5px;
+    border-radius: 999px;
+    transform: translate3d(-50%, 0, 0);
+    background: var(--fa-pane-strong);
+    border: 1px solid var(--dsw-alias-border-l1);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 34%, transparent),
+      0 10px 26px -12px var(--dsw-alias-bg-mask-3),
+      inset 0 1px 0 var(--fa-rim-light),
+      inset 0 -10px 20px -16px var(--fa-inner-glow);
+    backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+    -webkit-backdrop-filter: blur(var(--fa-blur-strong)) saturate(var(--fa-saturate));
+    transition:
+      transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 280ms ease;
+    /* The dock is chrome: it must not be selectable, draggable or callout-able
+       on a long press. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  /* A drawer owns the screen while it is open; the dock gets out of its way. */
+  body[data-fa-drawer] [data-fa-dock] {
+    transform: translate3d(-50%, 160%, 0);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .fa-dock__button {
+    position: relative;
+    width: 52px;
+    height: 42px;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background-color: transparent;
+    color: var(--dsw-alias-label-secondary);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+  }
+
+  .fa-dock__button[hidden] {
+    display: none;
+  }
+
+  .fa-dock__button:active {
+    transform: scale(0.92);
+  }
+
+  /* The glyphs are drawn with masks rather than inline SVG so they inherit
+     `currentColor` from the button and need no per-state asset. */
+  .fa-dock__glyph {
+    width: 22px;
+    height: 22px;
+    background-color: currentColor;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    transition: transform 180ms ease;
+  }
+
+  .fa-dock__glyph--menu {
+    -webkit-mask-image: var(--fa-icon-menu);
+    mask-image: var(--fa-icon-menu);
+  }
+
+  .fa-dock__glyph--new {
+    -webkit-mask-image: var(--fa-icon-new);
+    mask-image: var(--fa-icon-new);
+  }
+
+  .fa-dock__glyph--search {
+    -webkit-mask-image: var(--fa-icon-search);
+    mask-image: var(--fa-icon-search);
+  }
+
+  .fa-dock__glyph--library {
+    -webkit-mask-image: var(--fa-icon-library);
+    mask-image: var(--fa-icon-library);
+  }
+
+  .fa-dock__glyph--settings {
+    -webkit-mask-image: var(--fa-icon-settings);
+    mask-image: var(--fa-icon-settings);
+  }
+
+  /* The active item gets the Aero "lit lens": an aqua bloom behind the glyph. */
+  [data-fa-dock-open] .fa-dock__button[data-fa-dock-action="menu"] {
+    color: var(--dsw-alias-state-business-primary);
+  }
+
+  [data-fa-dock-open] .fa-dock__button[data-fa-dock-action="menu"] .fa-dock__glyph {
+    transform: scale(1.06);
+  }
+}
+
+/* ══ The reading measure ════════════════════════════════════════════════════
+   The conversation declares
+
+     --dsh-chat-content-width: clamp(680px, columnWidth * .64, 920px)
+
+   whose *floor* is 680px. On a 390px phone that floor is wider than the
+   viewport, so every turn is laid out at 680px inside a ~350px box and clipped:
+   the transcript renders as a column of left-edge slivers. The product never
+   hits this in the stock layout because the sidebar squeezes the transcript to
+   108px first — which is worse, and is what the drawer above fixes.
+
+   Declared on `[data-conversation-scroll]` because that is the common ancestor
+   of both the transcript and the composer seat, so one declaration fixes the
+   reading column and the composer card together. `100%` rather than `100vw`
+   so the value still tracks the real column on a tablet, and `min(…, 680px)`
+   so a viewport wide enough for the product's own measure keeps it. */
+
+@media (max-width: 1023px) {
+  [data-conversation-scroll] {
+    --dsh-chat-content-width: min(100%, 680px) !important;
+  }
+}
+
+/* ══ Touch ergonomics ═══════════════════════════════════════════════════════
+   Applies on any coarse pointer, at any width — a touch laptop deserves the
+   same hit areas as a phone. */
+
+@media (pointer: coarse) {
+  /*
+   * 44px is the smallest reliable target. `min-height` rather than `height`, so
+   * a control that is already larger keeps its own size, and the extra box is
+   * added without moving the glyph (the product centres its own content).
+   */
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary, a[href]) {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Dense icon clusters (toolbars, message actions, file rows) are explicitly
+     exempt: forcing 44px there would reflow the whole strip and make the
+     product *harder* to use, so they get a smaller floor that still clears the
+     usual 36px toolbar rhythm. */
+  :is([data-actions-reveal], [data-message-attachments], [data-composer-stats], [data-files-row], [data-turn-tail])
+    :is(button, [role="button"]) {
+    min-height: 36px;
+    min-width: 36px;
+  }
+
+  /*
+   * iOS Safari zooms the whole page when a focused field's text is under 16px,
+   * and the zoom is sticky — the user then has to pinch back out. The composer's
+   * own sizing stays intact; only the floor moves.
+   */
+  :is(input, textarea, select, [contenteditable="true"]) {
+    font-size: max(16px, 1em);
+  }
+
+  /* Kills the 300ms tap delay and the double-tap-zoom gesture without touching
+     pinch-zoom, which stays available for accessibility. */
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary, label) {
+    touch-action: manipulation;
+  }
+
+  /* Text that is not meant to be selected must not pop a callout on long press
+     — but real content keeps its selection, which is the point of a chat UI. */
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [data-fa-dock], [data-fa-col="sidebar"]) {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Scroll containers: momentum, a contained overscroll (so a flick at the end
+     of the transcript does not bounce the page), and no scroll anchoring jumps
+     while streaming. */
+  :is([data-conversation-scroll], [data-trajectory-scroll], [data-approval-scroll], [data-input-scroll], [data-files-entry]) {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  [data-conversation-scroll] {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ══ The keyboard ═══════════════════════════════════════════════════════════
+   iOS does not resize the layout viewport when the software keyboard opens; it
+   only shrinks `visualViewport`. Without this the composer sits underneath the
+   keyboard, which is the single most common mobile web-app defect. */
+
+body[data-fa-keyboard] [data-composer-seat] {
+  transform: translate3d(0, calc(-1 * var(--fa-keyboard)), 0);
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body[data-fa-keyboard] [data-fa-col="center"] {
+  padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+}
+
+/* ══ Dynamic viewport height ════════════════════════════════════════════════
+   `100vh` on a phone is the *large* viewport: the bottom of the layout sits
+   behind the browser's collapsing toolbar. `dvh` tracks the real visible area.
+   The product measures in `px` and is unaffected; this only corrects the frame
+   when it is sized from the viewport. */
+
+@supports (height: 100dvh) {
+  @media (max-width: 1023px) {
+    html,
+    body,
+    #root {
+      height: 100dvh;
+      min-height: 100dvh;
+    }
+  }
+}
+
+/* ══ Reduced motion ═════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-fa-col="sidebar"],
+  [data-fa-scrim],
+  [data-fa-dock],
+  .fa-dock__button,
+  .fa-dock__glyph,
+  body[data-fa-keyboard] [data-composer-seat] {
+    transition: none !important;
+  }
+}

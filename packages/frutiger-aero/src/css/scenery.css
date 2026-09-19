@@ -1,0 +1,346 @@
+/*
+ * scenery.css — the wallpaper.
+ *
+ * Nine layers of sky, sun, haze, light shafts, two hill ridges, water,
+ * caustics and bubbles, all inside one fixed element with `contain: strict`.
+ * The scene is therefore invisible to the application's layout: it cannot
+ * cause a reflow, it cannot be scrolled, and it never appears in a hit test.
+ *
+ * Two rules govern every animation below, and they are the reason a wallpaper
+ * this busy costs almost nothing:
+ *
+ *   1. Only `transform` and `opacity` are animated. Those are the two
+ *      properties a compositor can animate without asking the main thread to
+ *      re-layout, re-paint, or re-rasterise.
+ *   2. Nothing animates anything that sits *behind* a `backdrop-filter`. The
+ *      blur is applied by `material.css` to panes smaller than the viewport,
+ *      and the scene is deliberately built from large feathered gradients —
+ *      itself already the look a blur would produce — so no filter has to be
+ *      recomputed as the bubbles move.
+ */
+
+.fa-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  /* Deliberately *not* promoted. An early version carried
+     `will-change: transform; transform: translateZ(0)` here to "promote the
+     scene once", and on a 3x display the compositor then painted the promoted
+     negative-z-index layer above the app's own content — the transcript showed
+     through the wallpaper instead of the other way round. Nothing in the scene
+     claims a `will-change` hint (see the bubble block below), so the whole
+     wallpaper stays an ordinary fixed element and is unambiguously behind the
+     app. */
+  opacity: 1;
+  transition: opacity 600ms ease;
+}
+
+html[data-fa-idle] .fa-scene,
+html[data-fa-idle] .fa-scene * {
+  animation-play-state: paused !important;
+}
+
+.fa-scene__layer {
+  position: absolute;
+  inset: 0;
+}
+
+/* ── sky ────────────────────────────────────────────────────────────────────
+   A vertical sky gradient with a wide, soft horizon glow. Frutiger Aero's skies
+   are never flat: they run from a saturated zenith to a near-white horizon. */
+.fa-scene__sky {
+  background:
+    radial-gradient(120% 80% at 18% 118%, var(--fa-scene-glow) 0%, transparent 62%),
+    linear-gradient(180deg, var(--fa-sky-top) 0%, var(--fa-sky-mid) 46%, var(--fa-sky-low) 74%);
+}
+
+/* ── sun ────────────────────────────────────────────────────────────────────
+   One small disc, one enormous bloom. The bloom is what sells "Aero"; the disc
+   is what keeps it readable as a sun rather than a lens artefact. */
+.fa-scene__sun {
+  background:
+    radial-gradient(circle at 74% 16%, var(--fa-sun) 0 2.6%, transparent 3.1%),
+    radial-gradient(circle at 74% 16%, var(--fa-sun-glow) 0%, transparent 34%);
+  animation: fa-sun-breathe 26s ease-in-out infinite;
+}
+
+/* ── haze ───────────────────────────────────────────────────────────────────
+   The single most important layer for making the landscape read as *distance*
+   rather than as a coloured band. Real air scatters light, so a ridge a
+   kilometre away is almost the colour of the sky above it; without this the
+   hills are a hard green stripe crossing the page — which is exactly what the
+   first version of this file looked like. */
+.fa-scene__haze {
+  background: linear-gradient(
+    180deg,
+    transparent 40%,
+    color-mix(in srgb, var(--fa-haze) 80%, transparent) 52%,
+    color-mix(in srgb, var(--fa-haze) 55%, transparent) 74%,
+    transparent 96%
+  );
+}
+
+/* ── light shafts ───────────────────────────────────────────────────────────
+   Four skewed bands of light, drifting. This is the layer that most says
+   "2007 render", and it is the first thing dropped on a phone. */
+.fa-scene__rays {
+  opacity: 0.4;
+  /* Wide, heavily feathered bands, and masked away before they reach the
+     content. Narrow bands at full height read as diagonal stripes over the
+     transcript rather than as light in the air. */
+  background: repeating-linear-gradient(
+    102deg,
+    transparent 0 11%,
+    color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 11% 19%,
+    transparent 19% 34%
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 55%) 42%, transparent 74%);
+  mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 55%) 42%, transparent 74%);
+  transform-origin: 74% 6%;
+  animation: fa-rays-drift 42s ease-in-out infinite;
+}
+
+html.fa-tier-lite .fa-scene__rays,
+html.fa-tier-off .fa-scene__rays {
+  display: none;
+}
+
+/* ── hills ──────────────────────────────────────────────────────────────────
+   Two ridges, near and far. Ellipses rather than SVG: cheaper, resolution
+   independent, and they read as Frutiger Aero's rolling green hills once the
+   far ridge is hazed by the layer above it. */
+.fa-scene__hills {
+  top: auto;
+  /* The horizon sits at four fifths of the viewport. High enough that the
+     landscape reads as a landscape, low enough that the conversation — which
+     lives in the upper and middle band — is over sky rather than over water. */
+  bottom: 10%;
+  height: 16%;
+}
+
+.fa-scene__hills.fa-scene__far {
+  background:
+    radial-gradient(58% 100% at 14% 108%, var(--fa-hill-far) 0 99%, transparent 100%),
+    radial-gradient(72% 100% at 52% 116%, var(--fa-hill-far) 0 99%, transparent 100%),
+    radial-gradient(54% 100% at 92% 110%, var(--fa-hill-far) 0 99%, transparent 100%);
+  opacity: 0.85;
+}
+
+.fa-scene__hills.fa-scene__near {
+  bottom: 7%;
+  height: 11%;
+  background:
+    radial-gradient(64% 100% at 26% 118%, var(--fa-hill-near) 0 99%, transparent 100%),
+    radial-gradient(58% 100% at 78% 124%, var(--fa-hill-near) 0 99%, transparent 100%);
+}
+
+html.fa-tier-lite .fa-scene__hills.fa-scene__far,
+html.fa-tier-off .fa-scene__hills.fa-scene__far {
+  display: none;
+}
+
+/* ── water ──────────────────────────────────────────────────────────────────
+   The bottom third. The gradient plus the horizon highlight is the entire
+   effect; the shimmer is the caustics layer. */
+.fa-scene__water {
+  top: auto;
+  height: 14%;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--fa-gloss-top) 42%, transparent) 0 1px, transparent 1px),
+    linear-gradient(180deg, var(--fa-water-top) 0%, var(--fa-water-deep) 100%);
+}
+
+/* ── caustics ───────────────────────────────────────────────────────────────
+   Two interference patterns of refracted light, counter-drifting. This is the
+   most expensive visual in the skin (a large `background-position` animation,
+   so it repaints rather than composites), which is exactly why it is confined
+   to the `full` tier. */
+.fa-scene__caustics {
+  top: auto;
+  height: 14%;
+  opacity: 0.55;
+  mix-blend-mode: soft-light;
+  background-image:
+    repeating-radial-gradient(
+      ellipse 60% 30% at 30% 10%,
+      color-mix(in srgb, var(--fa-caustic) 55%, transparent) 0 1.4%,
+      transparent 1.4% 7%
+    ),
+    repeating-radial-gradient(
+      ellipse 40% 22% at 70% 0%,
+      color-mix(in srgb, var(--fa-caustic) 38%, transparent) 0 1.1%,
+      transparent 1.1% 6%
+    );
+  animation: fa-caustics 24s linear infinite;
+}
+
+html.fa-tier-lite .fa-scene__caustics,
+html.fa-tier-off .fa-scene__caustics {
+  display: none;
+}
+
+/* ── bubbles ────────────────────────────────────────────────────────────────
+   The signature. Each bubble is one element carrying its own timing as custom
+   properties, so a single keyframe pair drives all of them and the whole
+   population shares one composited layer set.
+
+   No `will-change` here: 22 bubbles would be 22 promoted compositor layers, and
+   an animated `transform` is promoted by the engine on its own. Claiming the
+   hint per element is how a wallpaper ends up costing more than the app.
+
+   The gloss is three stacked gradients on the same element: a bright specular
+   dot, a soft sheen sweeping the upper left, and a rim that is brighter at the
+   bottom edge than the top — which is what makes a circle read as a *sphere*
+   rather than a disc. */
+.fa-scene__bubbles {
+  overflow: hidden;
+}
+
+.fa-scene__bubble {
+  position: absolute;
+  left: var(--fa-x, 40%);
+  bottom: -14vh;
+  width: var(--fa-size, 40px);
+  height: var(--fa-size, 40px);
+  border-radius: 50%;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 32% 26%, var(--fa-bubble-core) 0 12%, transparent 34%),
+    radial-gradient(circle at 36% 30%, var(--fa-bubble) 0 30%, transparent 62%),
+    radial-gradient(circle at 50% 50%, transparent 58%, var(--fa-bubble-rim) 88%, transparent 100%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--fa-bubble-rim) 60%, transparent),
+    inset -3px -5px 10px color-mix(in srgb, var(--fa-bubble-rim) 30%, transparent),
+    inset 3px 4px 12px color-mix(in srgb, var(--fa-bubble-core) 45%, transparent),
+    0 0 14px color-mix(in srgb, var(--fa-bubble-rim) 35%, transparent);
+  animation: fa-bubble-rise var(--fa-duration, 24s) linear infinite;
+  animation-delay: var(--fa-delay, 0s);
+}
+
+html.fa-tier-lite .fa-scene__bubble {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fa-bubble-rim) 50%, transparent);
+}
+
+/* ── veil ───────────────────────────────────────────────────────────────────
+   Last, and always on top of the wallpaper. Two jobs: it guarantees the
+   contrast floor for text that ends up over the scene, and it is the layer the
+   bloom comes from — the soft bright wash at the top is what makes the whole
+   page feel lit from above. */
+.fa-scene__veil {
+  background:
+    radial-gradient(140% 90% at 50% -20%, color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 0%, transparent 60%),
+    linear-gradient(180deg, transparent 0%, var(--fa-scene-veil) 100%);
+}
+
+/* ── grain ──────────────────────────────────────────────────────────────────
+   A barely-there film grain, and the last thing added to the scene. Aero
+   wallpapers were photographs, and large flat gradients are the giveaway that
+   this one is not: at 4% opacity the noise is invisible as texture but it stops
+   the sky from banding on an 8-bit display, which is the failure mode a
+   gradient this wide actually has.
+
+   Applied to the scene rather than the app, so it is behind the glass — the way
+   film grain is behind a window — and costs no extra layer of its own. */
+.fa-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+html.fa-tier-lite .fa-scene::after {
+  display: none;
+}
+
+/* ── keyframes ──────────────────────────────────────────────────────────────
+   Five animations for the entire wallpaper. All transform/opacity except the
+   caustics, which is why only the caustics is tier-restricted. */
+
+@keyframes fa-bubble-rise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.72);
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--fa-opacity, 0.5);
+  }
+  50% {
+    transform: translate3d(calc(var(--fa-drift, 0vw) * 0.55), calc(-58vh - var(--fa-lift, 0vh)), 0)
+      scale(calc(0.86 + var(--fa-wobble, 0.8) * 0.1));
+    opacity: var(--fa-opacity, 0.5);
+  }
+  88% {
+    opacity: calc(var(--fa-opacity, 0.5) * 0.5);
+  }
+  100% {
+    transform: translate3d(var(--fa-drift, 0vw), calc(-116vh - var(--fa-lift, 0vh)), 0) scale(1.04);
+    opacity: 0;
+  }
+}
+
+@keyframes fa-sun-breathe {
+  0%,
+  100% {
+    transform: scale(1) translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.06) translate3d(-1.2%, 0.8%, 0);
+    opacity: 0.88;
+  }
+}
+
+@keyframes fa-rays-drift {
+  0%,
+  100% {
+    transform: rotate(-1.6deg) scale(1.12);
+    opacity: 0.42;
+  }
+  50% {
+    transform: rotate(1.4deg) scale(1.18);
+    opacity: 0.62;
+  }
+}
+
+@keyframes fa-caustics {
+  0% {
+    background-position: 0% 0%, 40% 0%;
+  }
+  100% {
+    background-position: 120% 18%, -80% 12%;
+  }
+}
+
+/* Reduced motion: the scene stays, because it is the theme, but it stops. */
+@media (prefers-reduced-motion: reduce) {
+  .fa-scene,
+  .fa-scene * {
+    animation: none !important;
+  }
+
+  .fa-scene__bubbles {
+    opacity: 0.5;
+  }
+
+  /* The rise animation is what normally distributes the bubbles over the
+     viewport, so freezing it would leave them all in a row below the fold.
+     `--fa-lift` is the per-bubble vertical variation the animation already
+     uses, which makes it the natural thing to spread them with — and it is
+     independent of `--fa-x`, so the population stays scattered rather than
+     collapsing onto one diagonal. */
+  .fa-scene__bubble {
+    opacity: 0.4;
+    bottom: auto;
+    top: calc(12% + var(--fa-lift, 0vh) * 3.4);
+    transform: none;
+  }
+
+  .fa-scene__bubbles {
+    /* The scene's own wash already guarantees contrast; this only stops the
+       frozen population from looking accidental. */
+    opacity: 0.85;
+  }
+}

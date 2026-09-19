@@ -1,0 +1,33 @@
+{
+  "name": "dsh-frutiger-aero-workspace",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Frutiger Aero for the DeepSeek Harness Web UI — the plugin, its portable installer, its bilingual landing page and its verification harness.",
+  "license": "MIT",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "theme",
+    "skin",
+    "frutiger-aero"
+  ],
+  "homepage": "https://Hotsteel2901.github.io/dsh-frutiger-aero/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hotsteel2901/dsh-frutiger-aero.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hotsteel2901/dsh-frutiger-aero/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node packages/frutiger-aero/build.mjs",
+    "install-profile": "node install.mjs",
+    "uninstall-profile": "node install.mjs --uninstall",
+    "serve-docs": "node -e \"const{createServer}=require('node:http'),{readFileSync,existsSync}=require('node:fs');const t={'.html':'text/html','.css':'text/css','.js':'text/javascript','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml'};createServer((q,s)=>{let p='docs'+(q.url==='/'?'/index.html':q.url.split('?')[0]);if(!existsSync(p)){s.writeHead(404).end();return}s.writeHead(200,{'content-type':t[p.slice(p.lastIndexOf('.'))]||'application/octet-stream'});s.end(readFileSync(p))}).listen(8099,'127.0.0.1',()=>console.log('http://127.0.0.1:8099/'))\""
+  }
+}

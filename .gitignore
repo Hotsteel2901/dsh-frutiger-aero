@@ -1,0 +1,9 @@
+# The plugin itself has no dependencies at all; these are the harness's.
+.devtools/node_modules/
+.devtools/package-lock.json
+node_modules/
+*.log
+
+# Scratch output from the verification runs.
+/tmp/
+*.tmp

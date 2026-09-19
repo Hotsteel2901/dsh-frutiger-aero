@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en" data-lang="en" data-scheme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Frutiger Aero for DeepSeek Harness — a glass UI skin that fits a phone</title>
+    <meta
+      name="description"
+      content="A portable dsh profile bundle that reskins the DeepSeek Harness browser UI in Frutiger Aero — glass, water, sky and bubbles — and rebuilds the phone layout around a thumb. Desktop and mobile, light and dark, zero dependencies."
+    />
+    <meta name="theme-color" content="#eefaff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#03202f" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://Hotsteel2901.github.io/dsh-frutiger-aero/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="dsh-frutiger-aero" />
+    <meta property="og:title" content="Frutiger Aero for DeepSeek Harness" />
+    <meta
+      property="og:description"
+      content="Glass, water, sky and bubbles for the dsh browser UI — plus a phone layout that finally fits a thumb. Desktop and mobile, light and dark, zero dependencies."
+    />
+    <meta property="og:url" content="https://Hotsteel2901.github.io/dsh-frutiger-aero/" />
+    <meta property="og:image" content="https://Hotsteel2901.github.io/dsh-frutiger-aero/assets/og.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Frutiger Aero for DeepSeek Harness" />
+    <meta
+      name="twitter:description"
+      content="A glass UI skin for the dsh browser surface that also fixes the phone layout. Desktop and mobile, light and dark, zero dependencies."
+    />
+    <meta name="twitter:image" content="https://Hotsteel2901.github.io/dsh-frutiger-aero/assets/og.jpg" />
+
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%234cc4ef'/%3E%3Cstop offset='1' stop-color='%230f7cb4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3Ccircle cx='12' cy='11' r='3.4' fill='%23fff' opacity='.85'/%3E%3Ccircle cx='21' cy='20' r='5' fill='%23fff' opacity='.28'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./assets/landing.css" />
+    <link rel="preload" as="image" href="./assets/shot-desktop-light.webp" />
+    <script src="./assets/landing.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#main" data-lang-block="en">Skip to content</a>
+    <a class="skip" href="#main" data-lang-block="zh">跳到正文</a>
+
+    <!-- The wallpaper: eight static layers, with the bubble population added by
+         script so its size can follow the device tier. -->
+    <div class="scene" aria-hidden="true">
+      <div class="scene__layer scene__sky"></div>
+      <div class="scene__layer scene__sun"></div>
+      <div class="scene__layer scene__haze"></div>
+      <div class="scene__layer scene__rays"></div>
+      <div class="scene__layer scene__hills scene__hills--far"></div>
+      <div class="scene__layer scene__hills scene__hills--near"></div>
+      <div class="scene__layer scene__water"></div>
+      <div class="scene__layer scene__caustics"></div>
+      <div class="scene__layer scene__bubbles"></div>
+    </div>
+
+    <header class="header">
+      <div class="shell header__inner">
+        <a class="brand" href="#top">
+          <span class="brand__drop" aria-hidden="true"></span>
+          <span class="brand__name">
+            Frutiger&nbsp;Aero
+            <span class="brand__sub">for dsh</span>
+          </span>
+        </a>
+        <div class="header__spacer"></div>
+
+        <button
+          class="lang__btn scheme"
+          type="button"
+          data-toggle-scheme
+          aria-pressed="false"
+          aria-label="Light / dark theme · 明暗主题"
+          title="Light / dark · 明 / 暗"
+        >
+          <span aria-hidden="true">◐</span>
+        </button>
+
+        <div class="lang" role="group" aria-label="Language">
+          <button class="lang__btn" type="button" data-set-lang="en" aria-pressed="true">EN</button>
+          <button class="lang__btn" type="button" data-set-lang="zh" aria-pressed="false">中文</button>
+        </div>
+
+        <a class="btn header__gh" href="https://github.com/Hotsteel2901/dsh-frutiger-aero" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- ══ Hero ══════════════════════════════════════════════════════════ -->
+      <section class="hero" id="top" data-loop-scope>
+        <div class="shell hero__grid">
+          <div>
+            <p class="eyebrow">
+              <span class="eyebrow__dot" aria-hidden="true"></span>
+              <span data-lang-block="en">dsh profile bundle · MIT · zero dependencies</span>
+              <span data-lang-block="zh">dsh profile 插件 · MIT · 零依赖</span>
+            </p>
+
+            <h1 data-lang-block="en">Glass, water, sky — and a phone layout that fits a thumb.</h1>
+            <h1 data-lang-block="zh">玻璃、水、天空 —— 以及终于顺手的手机布局。</h1>
+
+            <p class="lede" data-lang-block="en">
+              A portable plugin that reskins the DeepSeek Harness browser UI in
+              <strong>Frutiger Aero</strong>: frosted panes over a living wallpaper, aqua gloss on
+              everything you can press, and a bright rim on every edge. On a phone it stops being a
+              squeezed desktop and becomes an app — a drawer that slides instead of shrinking the
+              conversation, a dock under your thumb, and a composer that stays above the keyboard.
+            </p>
+            <p class="lede" data-lang-block="zh">
+              一个可移植插件，把 DeepSeek Harness 的网页界面整体换成
+              <strong>Frutiger Aero</strong>：会动的壁纸之上是磨砂玻璃面板，所有可点的东西都有水感高光和明亮描边。
+              在手机上，它不再是被压扁的桌面端，而是一个真正的 App —— 抽屉从侧边滑出而不是挤窄正文，
+              导航移到底部拇指够得到的地方，输入框永远停在键盘上方。
+            </p>
+
+            <div class="cmd">
+              <code id="cmd-npm">dsh plugin --profile web add dsh-frutiger-aero</code>
+              <button class="btn cmd__copy" type="button" data-copy="cmd-npm" aria-label="Copy the install command">
+                  <span class="cmd__label" data-lang-block="en">Copy</span>
+                  <span class="cmd__label" data-lang-block="zh">复制</span>
+                  <span class="cmd__done" data-lang-block="en">Copied</span>
+                  <span class="cmd__done" data-lang-block="zh">已复制</span>
+                </button>
+            </div>
+
+            <div class="cta">
+              <a class="btn btn--primary" href="#install">
+                <span data-lang-block="en">Install in one line</span>
+                <span data-lang-block="zh">一行命令安装</span>
+              </a>
+              <a class="btn" href="#mobile">
+                <span data-lang-block="en">See the phone layout</span>
+                <span data-lang-block="zh">看手机端布局</span>
+              </a>
+            </div>
+
+            <ul class="chips">
+              <li class="chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="12" rx="2" />
+                  <path d="M9 20h6" />
+                </svg>
+                <span data-lang-block="en">Desktop</span><span data-lang-block="zh">电脑端</span>
+              </li>
+              <li class="chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="7" y="2" width="10" height="20" rx="3" />
+                  <path d="M11 18h2" />
+                </svg>
+                <span data-lang-block="en">Mobile</span><span data-lang-block="zh">手机端</span>
+              </li>
+              <li class="chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 3v18" />
+                </svg>
+                <span data-lang-block="en">Light + dark</span><span data-lang-block="zh">明暗双主题</span>
+              </li>
+              <li class="chip">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M4 12l5 5L20 6" />
+                </svg>
+                <span data-lang-block="en">Keyboard &amp; touch</span>
+                <span data-lang-block="zh">键鼠与触屏</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="devices" aria-hidden="true">
+            <div class="device device--laptop">
+              <img
+                src="./assets/shot-desktop-light.webp"
+                width="1440"
+                height="900"
+                alt=""
+                decoding="async"
+                fetchpriority="high"
+              />
+            </div>
+            <div class="device device--phone">
+              <img
+                src="./assets/shot-phone-light.webp"
+                width="585"
+                height="1266"
+                alt=""
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Why ═══════════════════════════════════════════════════════════ -->
+      <section class="section" id="why">
+        <div class="shell">
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">Three things most skins get wrong</h2>
+            <h2 data-lang-block="zh">大多数皮肤做错的三件事</h2>
+            <p data-lang-block="en">
+              This one is built the way the product is built: through its own token system, against
+              its own stable hooks, and with a budget for every effect it adds.
+            </p>
+            <p data-lang-block="zh">
+              这个插件按照产品自身的方式来做：走它自己的 token 体系、用它自己稳定的钩子、
+              并且为每一处动效都算了开销。
+            </p>
+          </div>
+
+          <div class="cards">
+            <article class="card glass glossy reveal">
+              <div class="card__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M4 20V8l8-5 8 5v12" />
+                  <path d="M9 20v-6h6v6" />
+                </svg>
+              </div>
+              <h3 data-lang-block="en">The palette, not a coat of paint</h3>
+              <h3 data-lang-block="zh">换的是调色板，不是刷一层漆</h3>
+              <p data-lang-block="en">
+                Every surface, border and label in the product resolves through its semantic
+                <code>--dsw-alias-*</code> tokens. Overriding that tier retints the entire
+                application at once — including screens this plugin has never seen — and it composes
+                with the built-in light/dark switch instead of fighting it. A red button stays red; it
+                just becomes a glossy red button.
+              </p>
+              <p data-lang-block="zh">
+                产品里每个表面、边框和文字都走语义化的 <code>--dsw-alias-*</code> token。
+                覆盖这一层就一次性给整个应用换色 —— 包括这个插件从没见过的界面 ——
+                而且它和内置的明暗切换是协作而不是打架。红色按钮还是红的，只是变成了有高光的红按钮。
+              </p>
+            </article>
+
+            <article class="card glass glossy reveal">
+              <div class="card__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <rect x="7" y="2" width="10" height="20" rx="3" />
+                  <path d="M11 18h2" />
+                </svg>
+              </div>
+              <h3 data-lang-block="en">A phone layout, not a shrunken desktop</h3>
+              <h3 data-lang-block="zh">是手机布局，不是缩小的桌面端</h3>
+              <p data-lang-block="en">
+                Below 1024px the stock frame keeps the sidebar in the grid and squeezes everything
+                else: on a 390px phone the transcript gets <strong>108px</strong>. Here the sidebar
+                becomes an overlay drawer, the rail moves off-canvas, and a glass dock takes over — and
+                a conversation that declares a 680px-wide reading measure stops being clipped into
+                left-edge slivers.
+              </p>
+              <p data-lang-block="zh">
+                窄于 1024px 时，原生框架仍把侧栏留在网格里挤压其他一切：390px 手机上聊天记录只剩
+                <strong>108px</strong>。这里侧栏变成覆盖式抽屉，图标栏移出画布，换成底部玻璃 dock ——
+                同时修掉了「阅读宽度写死 680px 下限」导致每轮消息被裁成左边一条的问题。
+              </p>
+            </article>
+
+            <article class="card glass glossy reveal">
+              <div class="card__icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="M3 17l5-6 4 3 5-7 4 4" />
+                  <path d="M3 21h18" />
+                </svg>
+              </div>
+              <h3 data-lang-block="en">Effects that know when to stop</h3>
+              <h3 data-lang-block="zh">动效知道什么时候该停</h3>
+              <p data-lang-block="en">
+                A tier governor classifies the device from signals that cost nothing, then samples
+                real frame pacing for a second and downgrades <em>once</em> if they disagree. Only
+                <code>transform</code> and <code>opacity</code> are ever animated. A hidden tab pauses
+                everything.
+              </p>
+              <p data-lang-block="zh">
+                分级治理先用零成本信号判断设备，再采样约一秒真实帧率，不一致就<em>只降一次</em>。
+                全程只动 <code>transform</code> 和 <code>opacity</code>。标签页切到后台，一切暂停。
+              </p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Mobile ════════════════════════════════════════════════════════ -->
+      <section class="section" id="mobile">
+        <div class="shell">
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">On a phone</h2>
+            <h2 data-lang-block="zh">在手机上</h2>
+            <p data-lang-block="en">
+              Built for touch first, then verified with real touch input — CDP swipes and taps, not
+              synthetic events — across portrait, landscape and small phones.
+            </p>
+            <p data-lang-block="zh">
+              先按触屏来做，再用真实触摸输入验证 —— CDP 滑动与点击，不是合成事件 ——
+              覆盖竖屏、横屏和小屏手机。
+            </p>
+          </div>
+
+          <div class="split">
+            <div class="reveal">
+              <ul class="ticks">
+                <li data-lang-block="en">
+                  <strong>A drawer that slides over the content</strong> instead of stealing width from
+                  it, with a scrim that dismisses it and takes the tap that would have scrolled the
+                  page behind.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>覆盖式抽屉</strong>从内容上方滑出，而不是抢占正文宽度；遮罩可以点击关闭，
+                  并吃掉本该滚到背后页面的那一下触摸。
+                </li>
+
+                <li data-lang-block="en">
+                  <strong>Edge-swipe gestures</strong> — swipe from the left edge to open, swipe left
+                  to close, and vertical intent hands the gesture straight back to the scroller.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>边缘滑动手势</strong> —— 从左边缘滑开、向左滑关；一旦判定为竖向意图，
+                  手势立刻交还给滚动容器。
+                </li>
+
+                <li data-lang-block="en">
+                  <strong>A dock under your thumb</strong>, whose buttons click the product's own
+                  controls by accessible name rather than reimplementing anything.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>拇指区的底部 dock</strong>，按钮通过无障碍名称去点击产品自己的控件，
+                  不重复实现任何逻辑。
+                </li>
+
+                <li data-lang-block="en">
+                  <strong>A keyboard-aware composer</strong> — <code>visualViewport</code> publishes
+                  the occluded height, so the input lifts by exactly that much on iOS, where the layout
+                  viewport never resizes.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>感知键盘的输入框</strong> —— 用 <code>visualViewport</code> 发布被遮挡高度，
+                  在布局视口不缩放的 iOS 上把输入框精确抬起那么多。
+                </li>
+
+                <li data-lang-block="en">
+                  <strong>Touch ergonomics</strong> — 44px targets on coarse pointers, a 16px input
+                  floor that stops iOS's sticky focus zoom, momentum scrolling, contained overscroll,
+                  no tap highlight, and light haptics on press.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>触屏人体工学</strong> —— 粗指针下 44px 触控目标、16px 输入下限（治 iOS 聚焦缩放）、
+                  惯性滚动、overscroll 收敛、去掉点击高亮、按下时轻震动。
+                </li>
+
+                <li data-lang-block="en">
+                  <strong>Safe areas</strong> — <code>viewport-fit=cover</code> plus
+                  <code>env(safe-area-inset-*)</code> on the drawer, the dock and the composer, and
+                  <code>100dvh</code> instead of <code>100vh</code>.
+                </li>
+                <li data-lang-block="zh">
+                  <strong>安全区适配</strong> —— <code>viewport-fit=cover</code> 配合抽屉、dock、输入框上的
+                  <code>env(safe-area-inset-*)</code>，并用 <code>100dvh</code> 取代 <code>100vh</code>。
+                </li>
+              </ul>
+            </div>
+
+            <div class="phones reveal">
+              <figure>
+                <img
+                  src="./assets/shot-phone-light.webp"
+                  width="585"
+                  height="1266"
+                  alt="The dsh chat on a phone with the Frutiger Aero skin: a frosted glass composer, a glass to-do bar and a floating glass dock"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-lang-block="en">Light — glass over sky</figcaption>
+                <figcaption data-lang-block="zh">浅色 —— 天空之上的玻璃</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="./assets/shot-phone-dark.webp"
+                  width="585"
+                  height="1266"
+                  alt="The same phone view in the dark scheme: deep water, bioluminescent bubbles and a cyan-rimmed composer"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-lang-block="en">Dark — light under water</figcaption>
+                <figcaption data-lang-block="zh">深色 —— 水下的光</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src="./assets/shot-phone-drawer.webp"
+                  width="585"
+                  height="1266"
+                  alt="The navigation drawer open over the conversation, with a dimming scrim behind it"
+                  loading="lazy"
+                  decoding="async"
+                />
+                <figcaption data-lang-block="en">The drawer, over the content</figcaption>
+                <figcaption data-lang-block="zh">抽屉覆盖在正文之上</figcaption>
+              </figure>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Desktop ═══════════════════════════════════════════════════════ -->
+      <section class="section" id="desktop">
+        <div class="shell">
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">On a desktop, nothing is taken away</h2>
+            <h2 data-lang-block="zh">在电脑上，什么都不会被拿走</h2>
+            <p data-lang-block="en">
+              The three-column layout, the drag-to-resize handles, dialogs, menus, text selection,
+              wheel scrolling and keyboard input all still work — the skin adds material and changes
+              no behaviour.
+            </p>
+            <p data-lang-block="zh">
+              三栏布局、拖拽调宽手柄、弹窗、菜单、文字选择、滚轮滚动与键盘输入全部照常 ——
+              这层皮肤只增加材质，不改变行为。
+            </p>
+          </div>
+
+          <div class="compare">
+            <div class="stat glass glossy reveal">
+              <span class="stat__num">29/29</span>
+              <span class="stat__label" data-lang-block="en">interaction checks pass on a phone and on the desktop</span>
+              <span class="stat__label" data-lang-block="zh">交互断言在手机端与电脑端全部通过</span>
+            </div>
+            <div class="stat glass glossy reveal">
+              <span class="stat__num">0</span>
+              <span class="stat__label" data-lang-block="en">runtime dependencies — the browser half requires nothing at all</span>
+              <span class="stat__label" data-lang-block="zh">运行时依赖 —— 浏览器端不 require 任何模块</span>
+            </div>
+            <div class="stat glass glossy reveal">
+              <span class="stat__num">2</span>
+              <span class="stat__label" data-lang-block="en">product-level mobile defects fixed, not worked around</span>
+              <span class="stat__label" data-lang-block="zh">顺手修掉的产品级移动端缺陷</span>
+            </div>
+          </div>
+
+          <div class="reveal" style="margin-top: 26px">
+            <div class="device device--laptop">
+              <img
+                src="./assets/shot-desktop-dark.webp"
+                width="1440"
+                height="900"
+                alt="The dsh desktop layout in the dark scheme: a deep-water wallpaper behind frosted glass panes, with aqua accents"
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Install ═══════════════════════════════════════════════════════ -->
+      <section class="section" id="install">
+        <div class="shell">
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">Install</h2>
+            <h2 data-lang-block="zh">安装</h2>
+            <p data-lang-block="en">
+              Three ways in. The first needs only <code>dsh</code> and a package manager; the second
+              needs neither an npm account nor git; the third is for hacking on the plugin itself.
+            </p>
+            <p data-lang-block="zh">
+              三种方式。第一种只需要 <code>dsh</code> 和包管理器；第二种既不需要 npm 账号也不需要
+              git；第三种是给要改插件本身的人用的。
+            </p>
+          </div>
+
+          <div class="methods">
+            <div class="method glass glossy reveal">
+              <h3>
+                <span data-lang-block="en">1 · npm one-liner</span>
+                <span data-lang-block="zh">1 · npm 一行命令</span>
+                <span class="tag" data-lang-block="en">recommended</span>
+                <span class="tag" data-lang-block="zh">推荐</span>
+              </h3>
+              <div class="cmd">
+                <code id="cmd-1">dsh plugin --profile web add dsh-frutiger-aero</code>
+                <button class="btn cmd__copy" type="button" data-copy="cmd-1" aria-label="Copy the install command">
+                  <span class="cmd__label" data-lang-block="en">Copy</span>
+                  <span class="cmd__label" data-lang-block="zh">复制</span>
+                  <span class="cmd__done" data-lang-block="en">Copied</span>
+                  <span class="cmd__done" data-lang-block="zh">已复制</span>
+                </button>
+              </div>
+              <p data-lang-block="en">
+                Installs the latest version and registers it as a profile bundle. Reload the web UI
+                and it is on.
+              </p>
+              <p data-lang-block="zh">装上最新版本并注册为 profile bundle。刷新网页界面即可生效。</p>
+            </div>
+
+            <div class="method glass glossy reveal">
+              <h3>
+                <span data-lang-block="en">2 · GitHub installer</span>
+                <span data-lang-block="zh">2 · GitHub 安装脚本</span>
+                <span class="tag" data-lang-block="en">no npm account</span>
+                <span class="tag" data-lang-block="zh">无需 npm 账号</span>
+              </h3>
+              <div class="cmd">
+                <code id="cmd-2">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+                <button class="btn cmd__copy" type="button" data-copy="cmd-2" aria-label="Copy the install command">
+                  <span class="cmd__label" data-lang-block="en">Copy</span>
+                  <span class="cmd__label" data-lang-block="zh">复制</span>
+                  <span class="cmd__done" data-lang-block="en">Copied</span>
+                  <span class="cmd__done" data-lang-block="zh">已复制</span>
+                </button>
+              </div>
+              <p data-lang-block="en">
+                Downloads the latest release and installs it into a profile — no package manager, no
+                build step. On Windows, use <code>install.ps1</code> from the repository instead.
+              </p>
+              <p data-lang-block="zh">
+                下载最新发布版并装进 profile —— 不需要包管理器，也不需要构建。Windows 请改用仓库里的
+                <code>install.ps1</code>。
+              </p>
+            </div>
+
+            <div class="method glass glossy reveal">
+              <h3>
+                <span data-lang-block="en">3 · From a clone</span>
+                <span data-lang-block="zh">3 · 从克隆仓库安装</span>
+                <span class="tag" data-lang-block="en">for development</span>
+                <span class="tag" data-lang-block="zh">开发用</span>
+              </h3>
+              <div class="cmd">
+                <code id="cmd-3">git clone https://github.com/Hotsteel2901/dsh-frutiger-aero &amp;&amp; cd dsh-frutiger-aero &amp;&amp; node install.mjs</code>
+                <button class="btn cmd__copy" type="button" data-copy="cmd-3" aria-label="Copy the install command">
+                  <span class="cmd__label" data-lang-block="en">Copy</span>
+                  <span class="cmd__label" data-lang-block="zh">复制</span>
+                  <span class="cmd__done" data-lang-block="en">Copied</span>
+                  <span class="cmd__done" data-lang-block="zh">已复制</span>
+                </button>
+              </div>
+              <p data-lang-block="en">
+                Then <code>dsh --profile frutiger --port 3099 --no-open</code> and open the URL it
+                prints. Add <code>--link</code> to symlink the checkout so a rebuild is live.
+              </p>
+              <p data-lang-block="zh">
+                然后运行 <code>dsh --profile frutiger --port 3099 --no-open</code>，打开它打印的地址。
+                加 <code>--link</code> 可以改为软链接，重新构建即时生效。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ Performance ═══════════════════════════════════════════════════ -->
+      <section class="section" id="performance" data-loop-scope>
+        <div class="shell">
+          <div class="aurora" aria-hidden="true"></div>
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">What it costs</h2>
+            <h2 data-lang-block="zh">开销是多少</h2>
+            <p data-lang-block="en">
+              The one genuinely expensive property in the whole design is
+              <code>backdrop-filter</code>, and it is gated twice: off below the top tier, and applied
+              only to panes smaller than the viewport.
+            </p>
+            <p data-lang-block="zh">
+              整个设计里唯一真正昂贵的是 <code>backdrop-filter</code>，它被门控了两次：
+              低于最高档直接关闭，且只用在比视口小的面板上。
+            </p>
+          </div>
+
+          <div class="table-wrap glass reveal">
+            <table>
+              <thead>
+                <tr>
+                  <th data-lang-block="en">Tier</th>
+                  <th data-lang-block="zh">档位</th>
+                  <th data-lang-block="en">Chosen when</th>
+                  <th data-lang-block="zh">触发条件</th>
+                  <th data-lang-block="en">Wallpaper</th>
+                  <th data-lang-block="zh">壁纸</th>
+                  <th data-lang-block="en">Blur</th>
+                  <th data-lang-block="zh">模糊</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>full</code></td>
+                  <td data-lang-block="en">fine pointer, ≥ 3 cores, ≥ 4 GB</td>
+                  <td data-lang-block="zh">精细指针、≥ 3 核、≥ 4 GB</td>
+                  <td data-lang-block="en">22 bubbles, caustics, light shafts, grain</td>
+                  <td data-lang-block="zh">22 个气泡、水面焦散、光束、颗粒</td>
+                  <td data-lang-block="en">yes</td>
+                  <td data-lang-block="zh">开</td>
+                </tr>
+                <tr>
+                  <td><code>lite</code></td>
+                  <td data-lang-block="en">coarse pointer, small screen, ≤ 4 cores, save-data, reduced motion</td>
+                  <td data-lang-block="zh">粗指针、小屏、≤ 4 核、省流量、减少动效</td>
+                  <td data-lang-block="en">10 bubbles</td>
+                  <td data-lang-block="zh">10 个气泡</td>
+                  <td data-lang-block="en">no</td>
+                  <td data-lang-block="zh">关</td>
+                </tr>
+                <tr>
+                  <td><code>off</code></td>
+                  <td data-lang-block="en">explicit <code>?frutiger=off</code></td>
+                  <td data-lang-block="zh">显式 <code>?frutiger=off</code></td>
+                  <td data-lang-block="en">none — palette and layout only</td>
+                  <td data-lang-block="zh">无 —— 只保留配色与布局</td>
+                  <td data-lang-block="en">no</td>
+                  <td data-lang-block="zh">关</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══ FAQ ═══════════════════════════════════════════════════════════ -->
+      <section class="section" id="faq">
+        <div class="shell">
+          <div class="section__head reveal">
+            <h2 data-lang-block="en">Questions worth asking</h2>
+            <h2 data-lang-block="zh">值得问的问题</h2>
+          </div>
+
+          <div class="faq">
+            <details class="qa glass reveal">
+              <summary>
+                <span data-lang-block="en">Does it break the app, or leak outside the theme?</span>
+                <span data-lang-block="zh">会不会弄坏应用，或者污染主题之外的东西？</span>
+              </summary>
+              <p data-lang-block="en">
+                The host half is an empty <code>apply()</code> — no service, no tool, no session
+                state. The browser half paints and nothing else: stylesheets, nodes it owns, passive
+                listeners, and attributes on nodes the product owns. Every one of them is released
+                through <code>ctx.effect</code>, so setting <code>disabled: true</code> on the row in
+                <code>cordis.patch.yml</code> returns the page to stock.
+              </p>
+              <p data-lang-block="zh">
+                宿主端是一个空的 <code>apply()</code> —— 没有服务、没有工具、不碰会话状态。
+                浏览器端只负责绘制：样式表、自己创建的节点、被动监听器，以及产品自己节点上的属性。
+                每一项都通过 <code>ctx.effect</code> 释放，所以在 <code>cordis.patch.yml</code> 里
+                把这一行设为 <code>disabled: true</code> 就完全恢复原样。
+              </p>
+            </details>
+
+            <details class="qa glass reveal">
+              <summary>
+                <span data-lang-block="en">Will it fight my other plugins?</span>
+                <span data-lang-block="zh">会不会和其他插件打架？</span>
+              </summary>
+              <p data-lang-block="en">
+                Anything built on the <code>--dsw-*</code> tokens gets retinted along with the rest of
+                the app, which is usually what you want. A plugin that hardcodes its own colours, or
+                paints a full-viewport <code>backdrop-filter</code>, can still clash — that is a real
+                limitation, not a hypothetical one, and the honest answer is to try it.
+              </p>
+              <p data-lang-block="zh">
+                任何基于 <code>--dsw-*</code> token 的界面都会跟着一起换色，这通常正是你想要的。
+                但如果某个插件把颜色写死，或者在整屏上铺 <code>backdrop-filter</code>，仍可能冲突 ——
+                这是真实存在的限制，不是假设，诚实的答案是装上去试试。
+              </p>
+            </details>
+
+            <details class="qa glass reveal">
+              <summary>
+                <span data-lang-block="en">How do I turn it down or off?</span>
+                <span data-lang-block="zh">怎么调低或关掉？</span>
+              </summary>
+              <p data-lang-block="en">
+                Per browser: <code>window.__FRUTIGER__.setEffects('lite')</code>, or
+                <code>?frutiger=off</code> / <code>?frutiger=lite</code> / <code>?frutiger=full</code>
+                on the URL. Permanently: <code>node install.mjs --uninstall</code>, which removes the
+                package and its bundle entry and keeps the profile and its sessions.
+              </p>
+              <p data-lang-block="zh">
+                单个浏览器：<code>window.__FRUTIGER__.setEffects('lite')</code>，或者在地址栏加
+                <code>?frutiger=off</code> / <code>?frutiger=lite</code> / <code>?frutiger=full</code>。
+                永久移除：<code>node install.mjs --uninstall</code>，它会删掉包和 bundle 条目，
+                保留 profile 与会话。
+              </p>
+            </details>
+
+            <details class="qa glass reveal">
+              <summary>
+                <span data-lang-block="en">Which clients does it work with?</span>
+                <span data-lang-block="zh">支持哪些客户端？</span>
+              </summary>
+              <p data-lang-block="en">
+                It is a browser-surface plugin: anything that runs the dsh Web UI — including desktop
+                clients that embed it — gets the same skin. It is client-agnostic by construction
+                because it targets the product's own tokens and hooks rather than one client's DOM.
+              </p>
+              <p data-lang-block="zh">
+                这是一个浏览器界面插件：任何承载 dsh Web UI 的东西 —— 包括内嵌它的桌面客户端 ——
+                都会得到同一层皮肤。它天然与客户端无关，因为它针对的是产品自身的 token 与钩子，
+                而不是某一个客户端的 DOM。
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer__grid">
+        <div>
+          <p class="footer__note" data-lang-block="en">
+            <strong>dsh-frutiger-aero</strong> — MIT licensed. An unofficial community plugin; not
+            affiliated with or endorsed by DeepSeek.
+          </p>
+          <p class="footer__note" data-lang-block="zh">
+            <strong>dsh-frutiger-aero</strong> —— MIT 许可。非官方社区插件，与 DeepSeek 无隶属或背书关系。
+          </p>
+        </div>
+        <nav aria-label="Footer">
+          <a href="https://github.com/Hotsteel2901/dsh-frutiger-aero">GitHub</a> ·
+          <a href="https://github.com/Hotsteel2901/dsh-frutiger-aero/blob/main/README.md">README</a> ·
+          <a href="https://github.com/Hotsteel2901/dsh-frutiger-aero/blob/main/README.zh.md">中文文档</a> ·
+          <a href="https://github.com/topics/dsh-plugin">dsh-plugin</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

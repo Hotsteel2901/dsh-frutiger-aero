@@ -1,0 +1,44 @@
+# Publish the landing page in `docs/` to GitHub Pages.
+#
+# The page is a static file tree with no build step, so this workflow uploads it
+# as-is. If you would rather not run Actions at all, the same folder works with
+# Settings → Pages → Source → "Deploy from a branch" → `main` / `/docs`; delete
+# this file in that case, because the two mechanisms must not both be configured.
+name: Deploy landing page
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time, and never cancel one in flight: a half-published
+# site is worse than a slightly stale one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
