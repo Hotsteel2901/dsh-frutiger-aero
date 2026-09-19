@@ -450,3 +450,109 @@ body[data-fa-keyboard] [data-fa-col="center"] {
     transition: none !important;
   }
 }
+
+/* ══ The Trajectory view ════════════════════════════════════════════════════
+   The trajectory panel is a real two-column table — a 50px timeline gutter and
+   a content cell — and on a phone the content cell is exactly the width that is
+   left over, with `white-space: nowrap; overflow: hidden; text-overflow: clip`.
+   A row therefore shows the first forty characters of a line that can be three
+   thousand pixels long, and cuts off mid-glyph with no sign that anything is
+   missing. That is the "uncomfortable on mobile" part.
+
+   ## What is deliberately not changed
+
+   **Row height.** The list is virtualised, and the product positions it from a
+   fixed constant:
+
+       const CONTENT_ROW_HEIGHT = 30;
+
+   passed as `estimateSize` to the virtualiser, with **no `measureElement`** —
+   there is no measurement pass to correct a wrong estimate. Below 100 rows the
+   virtualiser is off entirely (`VIRTUALIZATION_THRESHOLD`) and taller rows would
+   look fine, which is exactly what makes this dangerous: it would work in
+   testing and break on a long session, where rows would overlap and the spacer
+   heights would drift. A skin does not get to desynchronise a list's layout
+   model, so the 30px row stays and the reading problem is solved sideways.
+
+   ## What is changed
+
+   The row keeps its height and its width, and its *content* becomes readable:
+   the cell scrolls horizontally under a finger, so a long line can be dragged
+   into view instead of being lost. Truncation is made visible with an ellipsis,
+   and the row gets a press affordance. All of it is scoped to coarse pointers
+   at narrow widths, so the desktop table is byte-for-byte what it was. */
+
+@media (pointer: coarse) and (max-width: 1023px) {
+  /* A hard cut at the cell edge reads as a rendering fault; an ellipsis reads as
+     "there is more here", which is also the affordance for the swipe below. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td {
+    text-overflow: ellipsis;
+  }
+
+  /* The horizontal scroller is not the cell — the cell fits its column exactly.
+     The clipping happens in *descendants*: for one tool call the request span is
+     180px wide holding 1627px of text, and the inline result holds 209px in
+     123px. So the rule goes on the subtree.
+
+     It can be this blunt because `overflow` does not apply to non-replaced
+     inline boxes: the payload spans that actually hold the long text are
+     `display: inline` and are left alone, while the block, grid and flex
+     wrappers that were doing the clipping become the scrollers.
+
+     Deliberately no `touch-action` override: a vertical drag inside one of these
+     must still scroll the list, and left alone the browser picks the axis from
+     the gesture — which is the behaviour we want and is not reproducible by
+     hand-declaring one axis. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child,
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child * {
+    overflow-x: auto;
+    /* `visible` is not available on one axis while the other scrolls — the
+       browser would compute it to `auto` and let a 19px line grow. */
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child::-webkit-scrollbar,
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child *::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* The timeline gutter is the anchor the rows are read against, so it stays
+     while the content beside it moves. It needs an opaque backdrop of its own,
+     or the scrolled text shows through it. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--dsw-alias-bg-base);
+    backdrop-filter: blur(10px) saturate(1.2);
+    -webkit-backdrop-filter: blur(10px) saturate(1.2);
+    box-shadow: 1px 0 0 var(--dsw-alias-border-l2);
+  }
+
+  /* 30px is short for a target but it is the row height we may not change, so
+     the row gets the feedback it can have: no 300ms tap delay, no double-tap
+     zoom, and a gloss that confirms the press. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] {
+    touch-action: manipulation;
+  }
+
+  [data-trajectory-scroll] tr[data-trajectory-row-key]:active > td {
+    background-image: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fa-gloss-top) 30%, transparent) 0 1px,
+      transparent 100%
+    );
+  }
+}
+
+html.fa-tier-lite [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first-child,
+html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first-child {
+  /* Below the top tier the pane under the gutter is opaque anyway, so the blur
+     would cost a filter for no visible difference. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--dsw-alias-bg-layer-3);
+}

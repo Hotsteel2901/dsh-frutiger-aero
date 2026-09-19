@@ -61,6 +61,7 @@ const client = `window.__ModuleLoader__.load({
 \t\tObject.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 ${indent(read('src/client/palette.js'), '\t\t')}
 ${indent(read('src/client/scenery.js'), '\t\t')}
+${indent(read('src/client/controls.js'), '\t\t')}
 ${indent(read('src/client/runtime.js'), '\t\t')}
 \t\t/** Stylesheets inlined at build time; see src/css/*.css. */
 \t\tconst FA_SHEETS = {

@@ -392,7 +392,9 @@ needed to install anything, but it is how every claim in this README was checked
 
 | script | what it answers |
 | --- | --- |
-| `interact.mjs` | **real input** — CDP touch swipes, taps, typing, wheel, drag, selection: 29 behavioural assertions per run |
+| `interact.mjs` | **real input** — CDP touch swipes, taps, typing, wheel, drag, selection: 29 assertions per run, in both shipped locales |
+| `docktest.mjs` | the phone dock in Chinese and English: 24 assertions per run |
+| `trajcheck.mjs` | the Trajectory view on a phone and on the desktop: 11 assertions |
 | `final.mjs` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |
 | `tiers.mjs` | the same page at `full` / `lite` / `off`, per viewport |
 | `lum.mjs` | rendered-contrast measurement, for finding things that only exist in pixels |
@@ -400,8 +402,9 @@ needed to install anything, but it is how every claim in this README was checked
 | `hit.mjs` | what a tap at each point of the viewport actually reaches |
 
 The suite runs against desktop, laptop, tablet, portrait phone, small phone and landscape phone,
-in both colour schemes, at every tier. Current state: **29/29 interaction checks** and **19/19
-landing checks**, with a clean console throughout.
+in both colour schemes, at every tier, and in both languages the client ships. Current state:
+**29/29 interaction checks** (×2 locales), **24/24 dock checks**, **11/11 Trajectory checks** and
+**19/19 landing checks**, with a clean console throughout.
 
 ---
 

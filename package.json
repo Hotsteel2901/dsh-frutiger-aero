@@ -1,9 +1,9 @@
 {
   "name": "dsh-frutiger-aero-workspace",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
-  "description": "Frutiger Aero for the DeepSeek Harness Web UI — the plugin, its portable installer, its bilingual landing page and its verification harness.",
+  "description": "Frutiger Aero for the DeepSeek Harness Web UI \u2014 the plugin, its portable installer, its bilingual landing page and its verification harness.",
   "license": "MIT",
   "keywords": [
     "dsh-plugin",

@@ -1,7 +1,7 @@
 {
   "name": "dsh-frutiger-aero",
-  "version": "1.0.0",
-  "description": "Frutiger Aero skin for the DeepSeek Harness Web UI: frosted glass over a living sky-and-water wallpaper, aqua gloss on every control, light and dark schemes built on the product's own token graph — plus a rebuilt narrow-viewport layout with an overlay drawer, a thumb-reachable dock and a keyboard-aware composer.",
+  "version": "1.0.1",
+  "description": "Frutiger Aero skin for the DeepSeek Harness Web UI: frosted glass over a living sky-and-water wallpaper, aqua gloss on every control, light and dark schemes built on the product's own token graph \u2014 plus a rebuilt narrow-viewport layout with an overlay drawer, a thumb-reachable dock and a keyboard-aware composer.",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

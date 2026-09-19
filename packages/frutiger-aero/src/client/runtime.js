@@ -396,16 +396,14 @@ function installMobileLayer(ctx, state) {
     }
   }, 'frutiger-aero: drawer scrim')
 
-  /** Ask the app itself to collapse the sidebar, so its own state stays the source of truth. */
-  const closeDrawer = () => {
-    const control = document.querySelector('button[aria-label="Collapse sidebar"], [aria-label="Collapse sidebar"]')
-    if (control instanceof HTMLElement) control.click()
-  }
-  /** The rail's open control is off-canvas on a phone, but still a live button. */
-  const openDrawer = () => {
-    const control = document.querySelector('[aria-label="Open sidebar"]')
-    if (control instanceof HTMLElement) control.click()
-  }
+  /**
+   * Ask the app itself to open or collapse the sidebar, so its own state stays
+   * the source of truth. Both directions resolve through `./controls.js`, which
+   * knows how the product labels and arranges these controls in every locale it
+   * ships — and that the brand mark is not a toggle.
+   */
+  const openDrawer = () => pressSidebar('open')
+  const closeDrawer = () => pressSidebar('close')
 
   ctx.effect(() => {
     const onScrimPointer = (event) => {
@@ -548,12 +546,17 @@ function installDock(ctx) {
   dock.dataset.faDock = ''
   dock.setAttribute('aria-label', 'Primary navigation')
 
+  /**
+   * Each entry names a *control*, not a selector. The dock's own labels stay
+   * English (it is this plugin's UI, and it has no locale system of its own),
+   * while the control it presses is resolved against the product's language.
+   */
   const entries = [
-    { id: 'menu', label: 'Menu', icon: 'menu', target: ':drawer', action: 'toggle' },
-    { id: 'new', label: 'New session', icon: 'new', target: '[aria-label="New session"]', action: 'click' },
-    { id: 'search', label: 'Search sessions', icon: 'search', target: '[aria-label="Search sessions"]', action: 'click' },
-    { id: 'library', label: 'Workspaces', icon: 'library', target: '[aria-label="Add workspace"]', action: 'click' },
-    { id: 'settings', label: 'Settings', icon: 'settings', target: '[aria-label="Settings"]', action: 'click' },
+    { id: 'menu', label: 'Menu', icon: 'menu', control: ':drawer' },
+    { id: 'new', label: 'New session', icon: 'new', control: 'newSession' },
+    { id: 'search', label: 'Search sessions', icon: 'search', control: 'searchSessions' },
+    { id: 'library', label: 'Workspaces', icon: 'library', control: 'addWorkspace' },
+    { id: 'settings', label: 'Settings', icon: 'settings', control: 'settings' },
   ]
 
   const buttons = entries.map((entry) => {
@@ -564,15 +567,13 @@ function installDock(ctx) {
     button.setAttribute('aria-label', entry.label)
     button.innerHTML = `<span class="fa-dock__glyph fa-dock__glyph--${entry.icon}" aria-hidden="true"></span>`
     button.addEventListener('click', () => {
-      if (entry.action === 'toggle') {
-        const frame = document.querySelector('[data-fa-frame]')
-        const open = frame !== null && !frame.hasAttribute('data-sidebar-collapsed')
-        const control = document.querySelector(open ? '[aria-label="Collapse sidebar"]' : '[aria-label="Open sidebar"]')
-        if (control instanceof HTMLElement) control.click()
+      // `data-fa-drawer` is the drawer's own state, so the direction asked for
+      // is the direction the user is looking at, not a guess from the rail.
+      if (entry.control === ':drawer') {
+        pressSidebar(document.body.hasAttribute('data-fa-drawer') ? 'close' : 'open')
         return
       }
-      const control = document.querySelector(entry.target)
-      if (control instanceof HTMLElement) control.click()
+      pressControl(entry.control)
     })
     return [entry, button]
   })
@@ -589,11 +590,12 @@ function installDock(ctx) {
   // the product did not render.
   ctx.effect(() => {
     const sync = () => {
-      const frame = document.querySelector('[data-fa-frame]')
-      const open = frame !== null && !frame.hasAttribute('data-sidebar-collapsed')
-      dock.toggleAttribute('data-fa-dock-open', open)
+      dock.toggleAttribute('data-fa-dock-open', document.body.hasAttribute('data-fa-drawer'))
       for (const [entry, button] of buttons) {
-        const present = entry.action === 'toggle' || document.querySelector(entry.target) !== null
+        // A button whose control the product does not offer must not render —
+        // and "offers" is answered by the resolver, so a Chinese install no
+        // longer hides the workspaces button because it looked for English.
+        const present = entry.control === ':drawer' || hasControl(entry.control)
         button.toggleAttribute('hidden', !present)
       }
     }

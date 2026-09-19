@@ -1,0 +1,28 @@
+import { chromium } from 'playwright-core'
+import fs from 'node:fs'
+import { openSession, openTab } from './lib/session.mjs'
+const URL = process.argv[2]
+const PROBE = fs.readFileSync('./probes/trajectory-structure.js', 'utf8')
+const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'zh-CN' })
+const page = await context.newPage()
+await page.goto(URL, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(3200)
+await page.evaluate(`localStorage.setItem('frutiger-aero:effects','full')`)
+await page.reload({ waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(3600)
+await openSession(page, '便携 DSH', { mobile: true })
+await openTab(page, '/Trajectory|轨迹/')
+const r = await page.evaluate('(' + PROBE + ')()')
+fs.writeFileSync('/tmp/fa-traj-structure.json', JSON.stringify(r, null, 1))
+console.log('scroller:', JSON.stringify(r.scroller))
+console.log('hasRealTable:', r.hasRealTable, '| tableish nodes:', r.tableishCount)
+console.log('\n--- table-ish nodes ---')
+for (const t of r.tableish || []) console.log(' ', t.display.padEnd(12), t.tag + '.' + t.cls, t.box, '| ws=' + t.whiteSpace, 'ovf=' + t.overflow)
+console.log('\n--- first row cells ---')
+for (const c of r.firstRowCells || []) console.log(' ', c.tag + '.' + c.cls, 'w=' + c.w, 'display=' + c.display, 'ws=' + c.whiteSpace, 'ovf=' + c.overflow, 'kids=' + c.kids)
+console.log('\n--- header cells ---')
+for (const c of r.headerCells || []) console.log(' ', JSON.stringify(c.text), c.box, c.display)
+console.log('\n--- sticky/fixed ---')
+for (const s of r.stickyOrFixed || []) console.log(' ', s.position, s.tag + '.' + s.cls, s.box)
+await browser.close()

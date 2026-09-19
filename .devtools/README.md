@@ -25,7 +25,9 @@ node landing.mjs http://127.0.0.1:8099/index.html # the GitHub Pages page
 
 | script | what it answers |
 | --- | --- |
-| `interact.mjs <url>` | **real input** — CDP touch swipes, `touchscreen.tap`, typing, wheel, drag, selection: 29 behavioural assertions |
+| `interact.mjs <url> [locale]` | **real input** — CDP touch swipes, `touchscreen.tap`, typing, wheel, drag, selection: 29 assertions. Run it in `en-US` **and** `zh-CN`; the client ships both, and passing in one is not passing |
+| `docktest.mjs <url>` | the phone dock, both locales: 24 assertions |
+| `trajcheck.mjs <url>` | the Trajectory view on a phone and on the desktop: 11 assertions |
 | `final.mjs <url> <out> [tier]` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |
 | `tiers.mjs <url>` | the same page at `full` / `lite` / `off`, per viewport |
 | `hit.mjs <url>` | what a tap at each point of the viewport actually reaches |
@@ -75,6 +77,14 @@ inside a single page session gives results that belong to the *last* variant rat
 one. `lum.mjs` reloads the page for every variant for exactly this reason. The first version of
 that test was cumulative and produced three identical numbers that looked like agreement and
 were not — it sent the investigation the wrong way for a while.
+
+**Passing in one language is passing in one language.** Every interaction script
+here ran with the default `en-US` locale, and the dock was driven by English
+`aria-label` lookups. The client ships exactly `["zh", "en"]`, so on a Chinese
+install every lookup returned nothing — and one of them matched the dock's own
+button, which then clicked itself until the stack blew. Nothing in the suite
+could see it. Locale is now a parameter, and `lib/session.mjs` asserts that an
+action changed the state instead of continuing quietly when it did not.
 
 **A `pointer-events: none` layer is invisible to the DOM.** The worst bug this plugin has had — a
 full-viewport `backdrop-filter` living on the right column, blurring and desaturating the entire

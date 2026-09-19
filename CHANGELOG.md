@@ -4,6 +4,59 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] — 2026-09-19
+
+Everything here was found by using the plugin on a real phone, in Chinese.
+
+### Fixed
+
+- **The phone dock was dead on any non-English install.** Buttons were resolved
+  by English `aria-label` (`[aria-label="Settings"]`), and the client ships
+  `zh` and `en` — on a Chinese install those lookups matched nothing. Worse, a
+  lookup for `[aria-label="New session"]` matched **the dock's own button**
+  (the dock's labels are English), so the handler clicked itself and recursed
+  until the stack blew. One root cause, four symptoms: a dead dock, a scrim that
+  would not dismiss the drawer, edge swipes that did nothing, and a workspaces
+  button that hid itself because it could not find its control.
+- Controls are now resolved through `src/client/controls.js`, in three layers:
+  a locale-independent `data-slot` hook where the slot's meaning is stable, the
+  product's **own dictionary strings** for both shipped locales (read out of
+  `dsh-client-ui-sidebar`, `-workspace` and `-settings-general`, not guessed),
+  and a structural fallback. Every lookup is scoped to `#root`, so a search can
+  never return one of this plugin's own controls again.
+- Also corrected a wrong assumption the old code encoded:
+  `[data-slot="sidebar.brand.mark"]` is **not** a sidebar toggle. It is inside
+  the "Open sidebar" button when the rail is collapsed and inside the "New
+  session" button when the drawer is open — so treating it as a toggle made a
+  close-drawer call quietly start a new session.
+
+### Changed
+
+- **The Trajectory view is readable on a phone.** It is a two-column table whose
+  content cell is one `nowrap` line, so a row showed the first forty characters
+  of a line up to three thousand pixels long and cut off mid-glyph with no sign
+  that anything was missing. On coarse pointers at narrow widths the content
+  now truncates with an ellipsis, scrolls horizontally under a finger so the
+  rest can be dragged into view, and the timeline gutter is pinned while it
+  moves.
+- **Row height is deliberately unchanged.** The list is virtualised and the
+  product positions it from `const CONTENT_ROW_HEIGHT = 30`, passed as
+  `estimateSize` with no `measureElement` — there is no measurement pass to
+  correct a wrong estimate. Taller rows would look right on a short session
+  (virtualisation only engages above 100 rows) and break on a long one. A skin
+  does not get to desynchronise a list's layout model.
+
+### Added
+
+- `interact.mjs` and `docktest.mjs` now run in **both shipped locales**; the
+  entire interaction suite passing in English was what let this through.
+- `.devtools/lib/session.mjs` — helpers that assert the state actually changed,
+  instead of continuing silently when an action did nothing.
+- `docktest.mjs` (24 checks, both locales) and `trajcheck.mjs` (11 checks, phone
+  and desktop).
+
+[1.0.1]: https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.0.1
+
 ## [1.0.0] — 2026-09-19
 
 First release.

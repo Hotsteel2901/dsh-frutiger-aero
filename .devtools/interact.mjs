@@ -1,5 +1,12 @@
 import { chromium } from 'playwright-core'
+import { openSession as openSessionAt, openDrawer, closeDrawer, isDrawerOpen } from './lib/session.mjs'
+
 const URL = process.argv[2]
+// The dock and the drawer used to be driven by English `aria-label`s, which
+// silently did nothing on a Chinese install. Running the whole suite in both
+// shipped locales is the regression test for that, so the locale is a parameter
+// rather than a constant.
+const LOCALE = process.argv[3] ?? 'en-US'
 const browser = await chromium.launch({ args: ['--no-sandbox'] })
 const results = []
 const check = (name, ok, detail) => { results.push({ name, ok, detail }); console.log((ok ? 'PASS ' : 'FAIL ') + name.padEnd(48) + (detail ?? '')) }
@@ -43,7 +50,7 @@ const boot = async (page, mobile) => {
 // ══ MOBILE ══════════════════════════════════════════════════════════════════
 {
   const viewport = { width: 390, height: 844 }
-  const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true })
+  const context = await browser.newContext({ viewport, isMobile: true, hasTouch: true, locale: LOCALE })
   const page = await context.newPage()
   const cdp = await context.newCDPSession(page)
   const errors = []
@@ -168,9 +175,10 @@ const boot = async (page, mobile) => {
   // 7. every dock item
   /** The dock hides itself while a drawer is open, so put the page back first. */
   const resetDrawer = async () => {
-    if (await page.evaluate(`document.body.hasAttribute('data-fa-drawer')`)) {
+    if (await isDrawerOpen(page)) {
       await page.touchscreen.tap(374, 300)
-      await page.waitForTimeout(1200)
+      await page.waitForTimeout(1400)
+      if (await isDrawerOpen(page)) await closeDrawer(page)
     }
   }
   for (const [label, probe] of [
@@ -223,7 +231,7 @@ const boot = async (page, mobile) => {
 
 // ══ DESKTOP ═════════════════════════════════════════════════════════════════
 {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: LOCALE })
   const page = await context.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 120)))
@@ -247,10 +255,19 @@ const boot = async (page, mobile) => {
   check('text selection works in the transcript', (await page.evaluate(`window.getSelection().toString().trim().length`)) > 3)
   await page.mouse.click(1100, 700)
 
-  await page.locator('[aria-label="Collapse sidebar"]').first().click({ force: true })
+  // Located by the product's own two locales, not by one language's string.
+  const clickSidebar = (names) => page.evaluate(`(() => {
+    const root = document.getElementById('root')
+    const names = ${JSON.stringify(names)}
+    const el = names.map((n) => root.querySelector('[aria-label=' + JSON.stringify(n) + ']')).find(Boolean)
+    if (!el) return false
+    el.click()
+    return true
+  })()`)
+  await clickSidebar(['Collapse sidebar', '收起侧边栏'])
   await page.waitForTimeout(1000)
   check('sidebar collapses on click', await page.evaluate(`document.querySelector('[data-fa-frame]').hasAttribute('data-sidebar-collapsed')`))
-  await page.locator('[aria-label="Open sidebar"]').first().click({ force: true })
+  await clickSidebar(['Open sidebar', '打开侧边栏'])
   await page.waitForTimeout(1000)
   check('sidebar expands on click', await page.evaluate(`!document.querySelector('[data-fa-frame]').hasAttribute('data-sidebar-collapsed')`))
 
@@ -266,7 +283,11 @@ const boot = async (page, mobile) => {
   const wAfter = await page.evaluate(`Math.round(document.querySelector('[data-fa-col="sidebar"]').getBoundingClientRect().width)`)
   check('sidebar resize handle still drags', wAfter !== wBefore, `${wBefore} -> ${wAfter}`)
 
-  await page.locator('[aria-label="Settings"]').first().click({ force: true })
+  await page.evaluate(`(() => {
+    const root = document.getElementById('root')
+    const el = ['Settings', '设置'].map((n) => root.querySelector('[aria-label=' + JSON.stringify(n) + ']')).find(Boolean)
+    if (el) el.click()
+  })()`)
   await page.waitForTimeout(2000)
   check('settings dialog opens', await page.evaluate(`document.querySelector('[role="dialog"]') !== null`))
   await page.screenshot({ path: '/tmp/fa-interact/desktop-settings.png' })
@@ -312,4 +333,4 @@ const boot = async (page, mobile) => {
 
 await browser.close()
 const failed = results.filter((r) => !r.ok)
-console.log(`\n${results.length - failed.length}/${results.length} checks passed${failed.length ? ' — FAILURES: ' + failed.map((f) => f.name).join(' | ') : ''}`)
+console.log(`\n[${LOCALE}] ${results.length - failed.length}/${results.length} checks passed${failed.length ? ' — FAILURES: ' + failed.map((f) => f.name).join(' | ') : ''}`)
