@@ -4,6 +4,54 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] — 2026-09-19
+
+Three phone-layout defects, all reported from real use.
+
+### Fixed
+
+- **The settings dialog was unreachable from the dock.** `sidebar.settings` is a
+  slot *inside* the sidebar column, so the panel, its scrim and its focus trap
+  all live in that subtree — and taking the column off-canvas took the dialog
+  with it. Tapping the gear appeared to do nothing until the drawer was opened
+  separately. The tagger now publishes when the sidebar holds a dialog, and the
+  stylesheet lifts the off-canvas treatment for as long as it does.
+
+  The load-bearing part is removing `transform`, not moving the column back: a
+  transform makes an element a containing block for `position: fixed`
+  descendants, and the dialog's scrim is fixed. Without the transform the scrim
+  resolves against the viewport again, while a `left` offset keeps the column
+  itself off screen — an offset moves a box without re-anchoring anything.
+
+- **The settings dialog kept its desktop layout on a phone.** The panel is a
+  flex row of a 188px `<nav>` rail and a content column; at 390px the content
+  was left 154px, so every label wrapped to one character per line (`权/限`,
+  `完/全/权/限`) and the theme cards became three slivers. At phone width it is
+  now a single column with the rail as a horizontally scrolling tab strip.
+
+- **Buttons were pushed off-centre on touch devices.** The coarse-pointer rule
+  gave every control `min-width: 44px`; the chat header's "choose an app to open
+  in" control is 22x26 and centres its chevron with `padding-left` under
+  `justify-content: normal` — the product positions that glyph from the box's
+  left edge. Widening the box left the glyph where it was, **11.5px off-centre**
+  (measured against a stock profile).
+
+  The target is now grown with a pseudo-element instead: centred on the control,
+  taking pointer events as part of it, and changing no layout at all. `::before`
+  was free because the hover sheen that also wants it lives inside a
+  `(hover: hover) and (pointer: fine)` query, so no device is ever both. Inline
+  prose links are excluded — a 44px invisible box around a word would overlap
+  the words beside it and steal taps meant for selection.
+
+### Changed
+
+- `aligndiff.mjs` measures off-centre controls against a **stock** profile and
+  reports only what the skin introduces. The raw metric flags left-aligned
+  content, which the product is full of; as a difference it is actionable.
+  Current result: **0 introduced**.
+
+[1.0.2]: https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.0.2
+
 ## [1.0.1] — 2026-09-19
 
 Everything here was found by using the plugin on a real phone, in Chinese.

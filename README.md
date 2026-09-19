@@ -395,6 +395,8 @@ needed to install anything, but it is how every claim in this README was checked
 | `interact.mjs` | **real input** — CDP touch swipes, taps, typing, wheel, drag, selection: 29 assertions per run, in both shipped locales |
 | `docktest.mjs` | the phone dock in Chinese and English: 24 assertions per run |
 | `trajcheck.mjs` | the Trajectory view on a phone and on the desktop: 11 assertions |
+| `settingscheck.mjs` | the settings dialog from the dock, both locales, phone and desktop: 23 assertions |
+| `aligndiff.mjs` | off-centre controls **introduced by the skin**, measured against a stock profile |
 | `final.mjs` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |
 | `tiers.mjs` | the same page at `full` / `lite` / `off`, per viewport |
 | `lum.mjs` | rendered-contrast measurement, for finding things that only exist in pixels |

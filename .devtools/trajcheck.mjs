@@ -55,15 +55,26 @@ async function swipe(cdp, from, to, steps = 14) {
   check('content cell scrolls horizontally', before.cellOvf[1] === 'auto', before.cellOvf.join(','))
   check('timeline gutter is pinned', before.gutterSticky === 'sticky', before.gutterSticky)
 
-  // the content cell can actually be dragged sideways
+  // Drag the scroller itself, found by its geometry.
+  //
+  // Picking a row and dragging from a fraction of its width looked reasonable
+  // and was flaky: a row's content is several nested spans, and the point that
+  // lands on the *scrolling* one depends on how long that row's text happens to
+  // be. Two runs, two different rows, two different answers. Ask for a scroller
+  // and drag from its centre.
   const cellBox = await page.evaluate(`(() => {
     const pane = document.querySelector('[data-trajectory-scroll]')
-    const row = [...pane.querySelectorAll('tr[data-trajectory-row-key]')].find(r => r.getBoundingClientRect().height > 10 && r.getBoundingClientRect().top > 200)
-    const cell = row.children[1]
-    const b = cell.getBoundingClientRect()
-    return { x: Math.round(b.left + b.width * 0.6), y: Math.round(b.top + b.height / 2) }
+    const nodes = [...pane.querySelectorAll('tr[data-trajectory-row-key] > td:last-child *')]
+    const scroller = nodes.find((n) => {
+      const b = n.getBoundingClientRect()
+      return n.scrollWidth > n.clientWidth + 60 && b.width > 60 && b.top > 140 && b.bottom < window.innerHeight - 180
+    })
+    if (!scroller) return null
+    const b = scroller.getBoundingClientRect()
+    return { x: Math.round(b.left + Math.min(b.width, 90) / 2), y: Math.round(b.top + b.height / 2) }
   })()`)
-  await swipe(cdp, { x: cellBox.x, y: cellBox.y }, { x: cellBox.x - 160, y: cellBox.y })
+  if (!cellBox) throw new Error('no on-screen horizontal scroller found in the trajectory')
+  await swipe(cdp, { x: cellBox.x, y: cellBox.y }, { x: Math.max(6, cellBox.x - 150), y: cellBox.y })
   await page.waitForTimeout(900)
   // The scrollers are the *descendants* that used to clip — the cell itself
   // fits its column exactly, so its own scrollLeft is always 0.

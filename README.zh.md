@@ -370,6 +370,8 @@ CSS-module 的类名是按构建哈希的（`.pI_x6G_sidebarCol`），拿它当�
 | `interact.mjs` | **真实输入** —— CDP 触摸滑动、点击、键入、滚轮、拖拽、选择：每次运行 29 条断言，两种语言各跑一遍 |
 | `docktest.mjs` | 手机端底栏在中文与英文下：每次 24 条断言 |
 | `trajcheck.mjs` | 轨迹界面在手机端与电脑端：11 条断言 |
+| `settingscheck.mjs` | 从底栏打开设置：两种语言、手机与电脑端，23 条断言 |
+| `aligndiff.mjs` | 与原生 profile 对比，找出**由皮肤引入**的控件错位 |
 | `final.mjs` | 各视口下的布局、抽屉、dock、计算样式、控制台报错与截图 |
 | `tiers.mjs` | 同一页面在 `full` / `lite` / `off` 三档下、各视口的表现 |
 | `lum.mjs` | 渲染对比度测量，用来找只存在于像素里的问题 |

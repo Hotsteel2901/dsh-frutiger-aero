@@ -352,23 +352,45 @@ body[data-fa-drawer] [data-fa-scrim] {
 
 @media (pointer: coarse) {
   /*
-   * 44px is the smallest reliable target. `min-height` rather than `height`, so
-   * a control that is already larger keeps its own size, and the extra box is
-   * added without moving the glyph (the product centres its own content).
+   * A touch target that does not move anything.
+   *
+   * The obvious way to get a 44px target is `min-width: 44px`, and it is wrong
+   * on an application you do not own. The chat header's "choose an app to open
+   * in" control is 22x26 and centres its 11px chevron with `padding-left: 4px`
+   * under `justify-content: normal` — that is, the product positions the glyph
+   * from the box's *left edge*. Widen the box and the glyph stays put while the
+   * box grows around it, so the icon ends up 11.5px off-centre: measured, not
+   * guessed.
+   *
+   * So the target is grown with a pseudo-element instead. It is centred on the
+   * control, takes pointer events as part of it, and changes no layout at all —
+   * nothing can be pushed out of alignment because nothing is resized.
+   *
+   * `::before` is free to use here: the hover sheen that also wants it lives
+   * inside a `(hover: hover) and (pointer: fine)` query, so a device is never
+   * both. The press ring keeps `::after` on every device.
+   *
+   * Inline prose links are deliberately excluded. A 44px invisible box around a
+   * word inside a paragraph would overlap the words beside it and steal taps
+   * meant for text selection, and a link in a sentence is read, not aimed at.
    */
-  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary, a[href]) {
-    min-height: 44px;
-    min-width: 44px;
+  :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary)::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
   }
 
-  /* Dense icon clusters (toolbars, message actions, file rows) are explicitly
-     exempt: forcing 44px there would reflow the whole strip and make the
-     product *harder* to use, so they get a smaller floor that still clears the
-     usual 36px toolbar rhythm. */
+  /* Dense icon clusters (toolbars, message actions, file rows) get a smaller
+     area on purpose: their controls sit on a ~36px pitch, and a 44px halo would
+     overlap both neighbours and make the strip harder to hit accurately. */
   :is([data-actions-reveal], [data-message-attachments], [data-composer-stats], [data-files-row], [data-turn-tail])
-    :is(button, [role="button"]) {
-    min-height: 36px;
-    min-width: 36px;
+    :is(button, [role="button"])::before {
+    width: max(100%, 36px);
+    height: max(100%, 36px);
   }
 
   /*
@@ -555,4 +577,130 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   background: var(--dsw-alias-bg-layer-3);
+}
+
+/* ══ A product modal that lives inside the sidebar ══════════════════════════
+   `sidebar.settings` is a slot *inside* the sidebar column, so the settings
+   panel and its scrim are part of that subtree. Taking the column off-canvas
+   therefore takes the dialog with it — the gear appeared to do nothing until
+   the user separately opened the drawer.
+
+   Lifting the `transform` is the load-bearing part, and for a reason that is
+   not obvious: a transform makes the element a containing block for
+   `position: fixed` descendants, and the dialog's scrim is fixed. Removing it
+   lets the scrim resolve against the viewport again, while `left` keeps the
+   column itself off screen — an offset moves the column without re-anchoring
+   anything. Measured: the panel sits at 23,23 in both cases, but only with the
+   transform gone is that 23,23 *of the viewport* rather than of a column parked
+   at -327px. */
+
+@media (max-width: 1023px) {
+  body[data-fa-dialog] [data-fa-col="sidebar"] {
+    transform: none !important;
+    visibility: visible !important;
+    /* Above the dock: the dialog is modal and the dock is not part of it. */
+    z-index: 70 !important;
+  }
+
+  body[data-fa-dialog] [data-fa-dock] {
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-50%, 160%, 0);
+  }
+}
+
+@media (max-width: 640px) {
+  /* The column is off-canvas on a phone anyway; keep it there by position
+     rather than by transform, so nothing inside it is re-anchored. */
+  body[data-fa-dialog] [data-fa-col="sidebar"] {
+    left: -102% !important;
+  }
+}
+
+/* ══ The settings dialog on a phone ═════════════════════════════════════════
+   The panel is `display: flex` with two children: a `<nav>` rail and a content
+   division. At 390px the rail takes 188px and the content is left 154px, so
+   every label wraps to one character per line — 权/限, 完/全/权/限 — and the
+   theme cards become three narrow columns. It is not a spacing problem; the
+   dialog is still laid out for a desktop window.
+
+   The rewrite is one column: the rail becomes a horizontally scrolling tab
+   strip with its title pinned, and the content takes the full width. Scoped
+   with `:has(> nav)` so it can only ever match the dialog that has a nav rail
+   — every other `[role="dialog"]` in the product is left exactly as it was. */
+
+@media (max-width: 640px) {
+  [role="dialog"]:has(> nav) {
+    position: fixed !important;
+    inset: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  /* The rail becomes a tab strip. */
+  [role="dialog"]:has(> nav) > nav {
+    flex: none !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 6px !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--dsw-alias-border-l2);
+    overflow: hidden !important;
+  }
+
+  /* Title pinned, tabs scrolling under it. */
+  [role="dialog"]:has(> nav) > nav > *:first-child {
+    flex: none !important;
+    margin: 0 4px 0 0 !important;
+  }
+
+  [role="dialog"]:has(> nav) > nav > *:last-child {
+    flex: 1 1 auto !important;
+    flex-direction: row !important;
+    width: auto !important;
+    min-width: 0;
+    gap: 4px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  [role="dialog"]:has(> nav) > nav > *:last-child::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Each tab sizes to its label instead of the rail's fixed 164px column, and
+     the label stops reserving 112px of its own. */
+  [role="dialog"]:has(> nav) > nav button {
+    flex: none !important;
+    width: auto !important;
+    min-height: 44px;
+    padding: 0 12px !important;
+    gap: 6px !important;
+    white-space: nowrap;
+  }
+
+  [role="dialog"]:has(> nav) > nav button span {
+    width: auto !important;
+    white-space: nowrap;
+  }
+
+  /* Content takes the rest of the column and owns the scrolling. */
+  [role="dialog"]:has(> nav) > div {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    min-height: 0;
+    min-width: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

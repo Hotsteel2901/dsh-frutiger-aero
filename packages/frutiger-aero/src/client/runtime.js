@@ -277,6 +277,16 @@ function installTagger(ctx) {
       canvas.setAttribute('data-fa-canvas', '')
     }
 
+    // The settings surface mounts *inside* the sidebar — `sidebar.settings` is
+    // its slot, so the panel, its scrim and its focus trap all live in that
+    // subtree. A drawer that is off-canvas therefore takes the dialog with it:
+    // the gear opened nothing visible until the user also opened the sidebar,
+    // which is a real bug and not a subtle one. Presence is a reliable signal
+    // (the dialog is mounted only while open), so the tagger publishes it and
+    // the stylesheet lifts the off-canvas treatment for as long as it holds.
+    const dialog = state.sidebar === null ? null : state.sidebar.querySelector('[role="dialog"]')
+    document.body.toggleAttribute('data-fa-dialog', dialog !== null)
+
     syncDrawer(state)
   }
 

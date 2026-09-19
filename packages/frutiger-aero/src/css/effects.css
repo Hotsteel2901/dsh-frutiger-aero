@@ -102,7 +102,10 @@
    because it is `transform`/`opacity` it never repaints the control it is drawn
    on. The haptic that accompanies it lives in runtime.js. */
 
-:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]) {
+/* Both pseudo-elements need a positioning context. Coarse pointers put the
+   invisible touch target on `::before` and fine pointers put the hover sheen
+   there; they are mutually exclusive by media query. */
+:is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], summary) {
   position: relative;
 }
 

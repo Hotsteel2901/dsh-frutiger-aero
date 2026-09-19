@@ -28,6 +28,9 @@ node landing.mjs http://127.0.0.1:8099/index.html # the GitHub Pages page
 | `interact.mjs <url> [locale]` | **real input** — CDP touch swipes, `touchscreen.tap`, typing, wheel, drag, selection: 29 assertions. Run it in `en-US` **and** `zh-CN`; the client ships both, and passing in one is not passing |
 | `docktest.mjs <url>` | the phone dock, both locales: 24 assertions |
 | `trajcheck.mjs <url>` | the Trajectory view on a phone and on the desktop: 11 assertions |
+| `settingscheck.mjs <url>` | the settings dialog opened from the dock — both locales, phone and desktop: 23 assertions |
+| `aligndiff.mjs <stock-url> <skin-url>` | off-centre controls **introduced by the skin**. The raw metric flags left-aligned content, which the product is full of; only the difference is actionable |
+| `alignstock.mjs <stock-url>` | the same alignment probe against a stock profile, driven by stock's own controls |
 | `final.mjs <url> <out> [tier]` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |
 | `tiers.mjs <url>` | the same page at `full` / `lite` / `off`, per viewport |
 | `hit.mjs <url>` | what a tap at each point of the viewport actually reaches |
