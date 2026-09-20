@@ -459,6 +459,80 @@ body[data-fa-drawer] [data-fa-scrim] {
   }
 }
 
+/* ══ Short viewports: landscape phones, and any window that lost its height ══
+   A phone held sideways has ~390px of height and 844px of width, and the
+   product's conversation body centres its content vertically:
+
+   ```
+   844x390 landscape, measured
+     wSkVaW_scrollBody     786x390   y=0..390   justify-content: center
+     wSkVaW_composerSeat   778x240   y=75..315
+   ```
+
+   A 240px composer seat inside a 390px body leaves **75px of dead space above
+   it and 75px below** — 150 of 390 pixels, thirty-eight percent of the screen,
+   spent on nothing. In portrait the same rule is invisible because 844px of
+   height dwarfs the content, so this only ever shows up after a rotation. The
+   screenshot is unambiguous: the empty state floats in the middle of the frame
+   with the wallpaper's horizon cutting through empty area underneath it.
+
+   Centring is the right default for a tall viewport — it is what puts the
+   empty state at a comfortable reading height instead of jammed under the
+   header. It is the wrong default when the content is nearly as tall as the
+   viewport, because then there is nothing left to centre.
+
+   The threshold is a *height* query, not an orientation one. What actually
+   breaks the layout is running out of vertical room, and that happens to a
+   desktop window dragged short or a tablet in split view just as surely as it
+   happens to a rotated phone. Keying on `orientation` would miss all of those
+   and would also be wrong on a square-ish window.
+
+   Where the content goes instead is the part worth getting right. Anchoring
+   everything to the top moves the problem rather than fixing it: the composer
+   then sits at the very top of the frame with 186px of dead space underneath
+   it, which is the same amount of waste at the opposite end — measured, after
+   a first attempt that did exactly that.
+
+   The composer belongs at the bottom of a conversation. What the body actually
+   wants is to distribute its two children — the transcript and the composer
+   seat — with the transcript taking the slack:
+
+   ```
+   body { justify-content: flex-start }   seat pins to the top   ✗ (measured)
+   body { justify-content: flex-end   }   seat pins to the bottom ✓
+   ```
+
+   `flex-end` puts the seat against the bottom edge and lets the transcript
+   occupy everything above it, which is what the tall-viewport layout does
+   anyway once the transcript has content to fill it.
+
+   The dock is deliberately *not* restored here. The rule above this one
+   already hides it below 460px of height and 900px of width — "landscape
+   phones: no vertical budget for a dock" — and that trade still holds: at
+   844x390 the product's own 57px rail is present and usable, so the phone is
+   not left without navigation, and the dock is the more expensive of the two
+   because it floats over the transcript. The space it would occupy is what
+   the `flex-end` above just reclaimed. */
+@media (max-height: 560px) {
+  :is([data-conversation-scroll], [class*="scrollBody"]) {
+    justify-content: flex-end !important;
+  }
+
+  /* With the content anchored to the bottom, the seat no longer needs the
+     breathing room the product gives it at full height. */
+  [data-composer-seat] {
+    padding-top: 0;
+  }
+
+  /* The empty-state hero carries a large block of top margin that exists to
+     centre it optically in a tall frame. Once the frame is short, that margin
+     is the reason the composer is pushed off the bottom. */
+  [class*="hero"] {
+    margin-top: 0 !important;
+    padding-top: 12px;
+  }
+}
+
 /* ══ The keyboard ═══════════════════════════════════════════════════════════
    iOS does not resize the layout viewport when the software keyboard opens; it
    only shrinks `visualViewport`. Without this the composer sits underneath the
