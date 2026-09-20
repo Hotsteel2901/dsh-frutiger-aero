@@ -1,5 +1,5 @@
 import { launch } from './lib/chromium.mjs'
-import { enter, freshPage } from './lib/gates.mjs'
+import { enter, freshPage, passGates } from './lib/gates.mjs'
 import fs from 'node:fs'
 import { openSession } from './lib/session.mjs'
 const URL = process.argv[2]
@@ -11,19 +11,24 @@ const check = (n, ok, d) => { results.push({ n, ok }); console.log((ok ? 'PASS '
 
 for (const [tag, opts] of [['zh-CN', { locale: 'zh-CN' }], ['en-US', { locale: 'en-US' }]]) {
   console.log(`\n── phone 390x844 · ${tag} ──`)
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opts })
-  const page = await context.newPage()
+  // `freshPage` + `enter`, not a bare context: without them the first-run API
+  // key dialog is still up and every assertion below measures a gate instead of
+  // the settings surface. The cache is disabled for the same reason everywhere
+  // else in this harness — a stale bundle reads as a passing test.
+  const page = await freshPage(browser, { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opts })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 140)))
-  await page.goto(URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForTimeout(3200)
+  await enter(page, URL, { settle: 3200 })
   await page.evaluate(`localStorage.setItem('frutiger-aero:effects','full')`)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(3600)
+  await passGates(page)
   await openSession(page, '便携 DSH', { mobile: true })
 
   // Tap the dock's Settings button — the exact path the user reported broken.
-  const dock = page.locator('[data-fa-dock] button[aria-label="Settings"]')
+  // The dock builds its own accessible names from the product's locale, so the
+  // selector has to accept both.
+  const dock = page.locator('[data-fa-dock] button[aria-label="Settings"], [data-fa-dock] button[aria-label="设置"]')
   const box = await dock.boundingBox()
   await page.touchscreen.tap(Math.round(box.x + box.width / 2), Math.round(box.y + box.height / 2))
   await page.waitForTimeout(2600)
@@ -81,21 +86,37 @@ for (const [tag, opts] of [['zh-CN', { locale: 'zh-CN' }], ['en-US', { locale: '
   check('sidebar back off-canvas after closing', await page.evaluate(`!document.body.hasAttribute('data-fa-dialog')`))
   check('no page errors', errors.length === 0, errors.slice(0, 2).join(' | '))
   await page.screenshot({ path: `${OUT}/after-close-${tag}.png` })
-  await context.close()
+  await page.__faContext.close()
 }
 
 // desktop must be untouched
 {
   console.log('\n── desktop 1440x900 ──')
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'en-US' })
-  const page = await context.newPage()
-  await page.goto(URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForTimeout(3200)
+  const page = await freshPage(browser, { viewport: { width: 1440, height: 900 }, locale: 'en-US' })
+  await enter(page, URL, { settle: 3200 })
   await page.evaluate(`localStorage.setItem('frutiger-aero:effects','full')`)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(3600)
-  await page.locator('body').getByText('便携 DSH', { exact: false }).first().click({ timeout: 9000, force: true })
+  await passGates(page)
+  // Same row-picking rule as `openSession`: the already-selected session is a
+  // no-op, and a home in this sandbox may hold only sessions that are already
+  // open, so select an unselected row and fall back to opening one directly.
+  await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll('.YDXeBa_sessionRow')]
+    const row = rows.find((r) => r.getAttribute('aria-selected') !== 'true') ?? rows[0]
+    if (row) row.click()
+  })()`)
   await page.waitForTimeout(9000)
+  if (await page.evaluate(`document.querySelectorAll('[data-chat-flow-kind]').length`) === 0) {
+    // No saved session on this home — start one so the surface under test is
+    // the settings dialog and not the empty hero.
+    await page.evaluate(`(() => {
+      const root = document.getElementById('root')
+      const el = ['New session', '新会话'].map((n) => root.querySelector('[aria-label=' + JSON.stringify(n) + ']')).find(Boolean)
+      if (el) el.click()
+    })()`)
+    await page.waitForTimeout(6000)
+  }
   await page.evaluate(`(() => { const r = document.getElementById('root'); const el = ['Settings','设置'].map(n => r.querySelector('[aria-label=' + JSON.stringify(n) + ']')).find(Boolean); if (el) el.click() })()`)
   await page.waitForTimeout(2400)
   const d = await page.evaluate(`(() => {
@@ -107,7 +128,7 @@ for (const [tag, opts] of [['zh-CN', { locale: 'zh-CN' }], ['en-US', { locale: '
   console.log('   ', JSON.stringify(d))
   check('desktop: dialog unchanged', d.dir === 'row' && d.navDir === 'column' && d.box.startsWith('319,49'), JSON.stringify(d))
   await page.screenshot({ path: `${OUT}/settings-desktop.png` })
-  await context.close()
+  await page.__faContext.close()
 }
 
 await browser.close()

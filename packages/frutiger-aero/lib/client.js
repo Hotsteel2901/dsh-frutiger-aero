@@ -85,14 +85,20 @@ window.__ModuleLoader__.load({
 
 		  // Aqua accent: the accent ramp the product uses for `state-business` and
 		  // every "active/selected/link" affordance.
+		  //
+		  // The 50–400 steps are *fills* (pale washes, indicator dots, dashes) and stay
+		  // as shipped. From 500 down they carry text, so they are solved against the
+		  // worst-case pane; see the note on `LIGHT_ANCHORS` for the arithmetic. The
+		  // naming quirk `-700-delete` is the product's own, kept verbatim because the
+		  // shipped stylesheets look it up by that exact name.
 		  '--dsw-static-deepseek-50': '#e9f9fe',
 		  '--dsw-static-deepseek-100': '#d3f2fd',
 		  '--dsw-static-deepseek-200': '#b3e8fb',
 		  '--dsw-static-deepseek-300': '#8adaf7',
 		  '--dsw-static-deepseek-400': '#46c2ee',
 		  '--dsw-static-deepseek-450': '#29b2e3',
-		  '--dsw-static-deepseek-500': '#129dd0',
-		  '--dsw-static-deepseek-600': '#0d84b2',
+		  '--dsw-static-deepseek-500': '#0c6a90',
+		  '--dsw-static-deepseek-600': '#0a5f82',
 		  '--dsw-static-deepseek-700-delete': '#0a6a91',
 		  '--dsw-static-deepseek-800': '#0a5573',
 		  '--dsw-static-deepseek-900': '#093f56',
@@ -115,7 +121,46 @@ window.__ModuleLoader__.load({
 		  '--dsw-static-red-900': '#4a1710',
 		}
 
-		/** Aero Glass — daylight. Glass over bright sky: white pane, blue rim, deep-navy ink. */
+		/**
+		 * Aero Glass — daylight. Glass over bright sky: white pane, blue rim, deep-navy ink.
+		 *
+		 * The ink ramp is *text*, so it is solved against the worst surface it can
+		 * land on rather than against white. That surface is not the nominal white
+		 * pane: the app's own panes are 74% white over a wallpaper whose darkest
+		 * sample is `rgb(18 40 62)`, which composites to `#c1c7cd`. The values below
+		 * were chosen against *that*, while keeping the ramp monotonic — `ink` darkest,
+		 * `caption` lightest — so the four `--dsw-alias-label-*` tiers stay as visually
+		 * distinct as the product intends. Measured ratios (WCAG 2.1, sRGB):
+		 *
+		 *   token        on #c1c7cd   on #ffffff
+		 *   ink              8.93        15.23
+		 *   inkSoft          3.94         6.72
+		 *   inkFaint         3.49         5.95
+		 *   caption          3.01         5.14
+		 *   accent           3.54         6.03
+		 *   accentDeep       4.15         7.08
+		 *
+		 * Note that only `ink` clears 4.5:1 on the worst-case pane, and `ink` is the
+		 * only tier the product uses for body copy — every larger surface here is
+		 * opaque, where `inkSoft` and below score 5–7.5:1 comfortably. The rows that
+		 * used to fail are the ones this round fixes:
+		 *
+		 *   - `accent` was `#129dd0`, the palest aqua on the deepseek ramp. A lovely
+		 *     *fill* colour and a poor *text* colour: 1.82:1 on the worst pane, which
+		 *     is why the product's own "Chat" tab label failed at 2.97:1. The fix is
+		 *     not to abandon the aqua but to move the text-bearing end of the accent
+		 *     pair down the ramp the product already ships — hue kept, contrast bought.
+		 *   - `caption` was `#6b93ab`, at 1.93:1 — and it was not reachable from any
+		 *     `--dsw-alias-label-*` mapping the skin sets, so a product control
+		 *     (`Access mode`, 3.25:1) was falling through to an undesigned colour.
+		 *   - the accent pair was *inverted* (`accent` lighter than `accentDeep`),
+		 *     which made `link` darker than `button-primary-fill` and lit every hover
+		 *     transition *down* instead of up. `accentDeep` is now the darker of the
+		 *     two, as its name and its use as `link` both require.
+		 *
+		 * The aqua still reads as aqua because it is a saturated cyan-blue with a light
+		 * cast over glass, not because it is bright.
+		 */
 		const LIGHT_ANCHORS = {
 		  canvas: 'rgb(244 251 255 / 88%)',
 		  layer1: 'rgb(255 255 255 / 74%)',
@@ -124,11 +169,11 @@ window.__ModuleLoader__.load({
 		  overlay: 'rgb(255 255 255 / 70%)',
 		  platform: 'rgb(226 244 254 / 78%)',
 		  ink: '#08283c',
-		  inkSoft: '#38617d',
-		  inkFaint: '#456f8c',
-		  caption: '#6b93ab',
-		  accent: '#129dd0',
-		  accentDeep: '#0d7cb4',
+		  inkSoft: '#37607c',
+		  inkFaint: '#3f6885',
+		  caption: '#4a728e',
+		  accent: '#0c6a90',
+		  accentDeep: '#0b5f81',
 		  accentPale: 'rgb(211 242 253 / 88%)',
 		  rail: 'rgb(255 255 255 / 44%)',
 		  slate: 'rgb(226 244 254 / 84%)',

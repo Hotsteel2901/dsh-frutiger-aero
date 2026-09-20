@@ -55,12 +55,67 @@ export async function closeDrawer(page) {
 /** Open a session by its visible title, and prove the transcript rendered. */
 export async function openSession(page, title, { mobile = false } = {}) {
   if (mobile) await openDrawer(page)
-  const row = page.locator('body').getByText(title, { exact: false }).first()
-  await row.click({ timeout: 10000, force: true }).catch(() => {})
+
+  /**
+   * Pick a row that will actually *do* something.
+   *
+   * The sidebar lists every session with `aria-selected`, and the one already
+   * open is `true`. Clicking that one is a no-op by design — which made an
+   * earlier version of this helper fail with 'no transcript rendered' on a home
+   * where the transcript was fine and only the row choice was wrong. Prefer an
+   * unselected row, and fall back to any row only if there is no other.
+   */
+  const pick = `(() => {
+    const rows = [...document.querySelectorAll('.YDXeBa_sessionRow')]
+    const wanted = ${JSON.stringify(title)}
+    const unselected = rows.filter((r) => r.getAttribute('aria-selected') !== 'true')
+    const matches = unselected.filter((r) => (r.textContent || '').includes(wanted))
+    return matches[0] ?? unselected[0] ?? rows.find((r) => (r.textContent || '').includes(wanted)) ?? null
+  })()`
+
+  const target = await page.evaluate(pick)
+  if (target !== null) {
+    // A real tap, not `.click()`: the plugin's own row handler listens for
+    // pointer events, and a synthetic click would skip the path a thumb takes.
+    const handle = await page.evaluate(`(() => {
+      const r = ${pick}
+      if (r === null) return null
+      const b = r.getBoundingClientRect()
+      return JSON.stringify({ x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) })
+    })()`)
+    if (handle !== null) {
+      const { x, y } = JSON.parse(handle)
+      await page.touchscreen.tap(x, y)
+    }
+  } else {
+    await page.locator('body').getByText(title, { exact: false }).first()
+      .click({ timeout: 10000, force: true }).catch(() => {})
+  }
   await page.waitForTimeout(9000)
-  const turns = await page.evaluate(`document.querySelectorAll('[data-chat-flow-kind]').length`)
+
+  let turns = await page.evaluate(`document.querySelectorAll('[data-chat-flow-kind]').length`)
   if (turns === 0) {
-    const state = await page.evaluate(`({ drawer: document.body.hasAttribute('data-fa-drawer'), path: location.pathname, title: document.title })`)
+    // One retry through a remaining unselected row before calling it a failure:
+    // the drawer animation can still be settling on the first attempt, and on a
+    // home with several sessions the first tap may land on one already open.
+    const retried = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('.YDXeBa_sessionRow')]
+        .filter((r) => r.getAttribute('aria-selected') !== 'true')
+      if (rows.length === 0) return false
+      rows[0].click()
+      return true
+    })()`)
+    if (retried) await page.waitForTimeout(7000)
+    turns = await page.evaluate(`document.querySelectorAll('[data-chat-flow-kind]').length`)
+  }
+
+  if (turns === 0) {
+    const state = await page.evaluate(`({
+      drawer: document.body.hasAttribute('data-fa-drawer'),
+      path: location.pathname,
+      title: document.title,
+      rows: [...document.querySelectorAll('.YDXeBa_sessionRow')].map((r) => (r.textContent || '').trim().slice(0, 40)),
+    })`)
     throw new Error(`openSession: no transcript rendered — ${JSON.stringify(state)}`)
   }
   if (mobile) await closeDrawer(page)

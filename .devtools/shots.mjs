@@ -1,5 +1,5 @@
 import { launch } from './lib/chromium.mjs'
-import { enter, freshPage } from './lib/gates.mjs'
+import { enter, passGates } from './lib/gates.mjs'
 import fs from 'node:fs'
 
 const URL = process.argv[2]
@@ -42,23 +42,38 @@ const setScheme = async (page, label, mobile) => {
   if (await page.evaluate(`document.body.hasAttribute('data-fa-drawer')`)) await closeDrawer(page)
 }
 
-async function load(viewport, dpr, mobile, colorScheme) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile, colorScheme })
+async function load(viewport, dpr, mobile, colorScheme, locale = 'en-US') {
+  const context = await browser.newContext({
+    viewport, deviceScaleFactor: dpr, isMobile: mobile, hasTouch: mobile, colorScheme, locale,
+  })
   const page = await context.newPage()
-  await page.goto(URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForTimeout(3200)
+  // `enter`, not a bare `goto`: a fresh Harness home opens modal first-run
+  // gates, and a screenshot taken behind one is a picture of a dialog rather
+  // than of the app. Every shot this file produced before it was routed
+  // through the gate-passer was exactly that.
+  await enter(page, URL, { settle: 3200 })
   await page.evaluate(`localStorage.setItem('frutiger-aero:effects','full')`)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(3600)
+  // The reload can raise a gate again on a home that has never been configured.
+  await passGates(page)
   if (mobile) await openDrawer(page)
-  await page.locator('body').getByText('便携 DSH', { exact: false }).first().click({ timeout: 9000, force: true }).catch(() => {})
+  // Prefer a session row by its stable class; the workspace-name text match is
+  // a fallback for homes whose session list is empty.
+  const row = page.locator('.YDXeBa_sessionRow').first()
+  if (await row.count()) {
+    await row.click({ timeout: 9000, force: true }).catch(() => {})
+  } else {
+    await page.locator('body').getByText('便携 DSH', { exact: false }).first()
+      .click({ timeout: 9000, force: true }).catch(() => {})
+  }
   await page.waitForTimeout(9000)
   await closeDrawer(page)
   return { context, page }
 }
 
-async function shot(name, viewport, dpr, mobile, prepare, scheme) {
-  const { context, page } = await load(viewport, dpr, mobile, scheme === 'Dark' ? 'dark' : 'light')
+async function shot(name, viewport, dpr, mobile, prepare, scheme, locale) {
+  const { context, page } = await load(viewport, dpr, mobile, scheme === 'Dark' ? 'dark' : 'light', locale)
   if (prepare) await prepare(page)
   await page.screenshot({ path: `${RAW}/${name}.png` })
   console.log('shot', name)
@@ -72,7 +87,13 @@ await shot('desktop-settings', DESKTOP, 2, false, async (p) => {
 }, 'Light')
 await shot('phone-light', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Light')
 await shot('phone-dark', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Dark')
+// The Chinese build is not a translation of the English one: the dock and the
+// sidebar carry different strings, and a label that fits in one can clip in the
+// other. One shot per locale is the cheapest way to keep that honest.
+await shot('phone-light-zh', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Light', 'zh-CN')
+await shot('phone-dark-zh', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Dark', 'zh-CN')
 await shot('phone-drawer', PHONE, 3, true, async (p) => { await openDrawer(p) }, 'Light')
+await shot('phone-drawer-zh', PHONE, 3, true, async (p) => { await openDrawer(p) }, 'Light', 'zh-CN')
 await shot('phone-preview', PHONE, 3, true, async (p) => {
   const link = p.locator('[data-fa-canvas] button:has-text("install.mjs")').first()
   await link.scrollIntoViewIfNeeded().catch(() => {})
