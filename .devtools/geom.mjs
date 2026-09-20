@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 const [url, tag, mobileArg] = process.argv.slice(2)
 const mobile = mobileArg === 'mobile'
 const browser = await launch({ args: ['--no-sandbox'] })

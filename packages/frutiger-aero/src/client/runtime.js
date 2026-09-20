@@ -427,6 +427,41 @@ function installMobileLayer(ctx, state) {
     }
   }, 'frutiger-aero: scrim dismissal')
 
+  // ── choosing a session dismisses the drawer ────────────────────────────
+  // The drawer covers the conversation, so tapping a session and leaving it up
+  // means the phone user has to make a *second*, unrelated gesture to see the
+  // thing they just asked for. Measured on a 390x844 touch viewport: the row
+  // reports `drawerStillOpen: true` after the tap.
+  //
+  // Selection is not implemented here — the row's own click still does that.
+  // This only observes that a choice was made and then asks the app to collapse,
+  // so the product's state stays the source of truth. Three guards keep it from
+  // firing when nothing was chosen: it is touch-only, it ignores taps on the
+  // row's action menu (whose menu is portal-rendered and therefore *outside* the
+  // row), and it ignores a row that is already the active one, since re-tapping
+  // the current session is a no-op the user did not ask to be dismissed for.
+  if (coarse) ctx.effect(() => {
+    const onRowClick = (event) => {
+      const target = event.target
+      if (!(target instanceof Element)) return
+      if (!isSessionRow(target)) return
+      if (isSessionActionEntry(target)) return
+      const row = target.closest('[role="treeitem"]')
+      if (row !== null && row.getAttribute('aria-selected') === 'true') return
+      // Let the product's own handler run first; collapsing is the *second*
+      // half of the interaction, not a replacement for it.
+      requestAnimationFrame(() => {
+        if (!document.body.hasAttribute('data-fa-drawer')) return
+        buzz(8)
+        closeDrawer()
+      })
+    }
+    document.addEventListener('click', onRowClick)
+    return () => {
+      document.removeEventListener('click', onRowClick)
+    }
+  }, 'frutiger-aero: drawer dismissal on session choice')
+
   // ── edge-swipe gestures ────────────────────────────────────────────────
   // A swipe that starts at the left edge opens the drawer; a swipe left on an
   // open drawer closes it. Deliberately narrow (26px) and vertical-tolerant so

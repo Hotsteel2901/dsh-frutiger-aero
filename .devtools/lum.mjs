@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import sharp from 'sharp'
 import fs from 'node:fs'
 const URL = process.argv[2]

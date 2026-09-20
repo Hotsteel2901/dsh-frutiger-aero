@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 
 /* The chat header's "open in Files" split button, measured with and without the
  * skin. My coarse-pointer rule puts a 44px floor on every button; if the product

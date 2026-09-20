@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 const [base, after] = process.argv.slice(2)
 const browser = await launch({ args: ['--no-sandbox'] })
 const PROBE = `(() => {

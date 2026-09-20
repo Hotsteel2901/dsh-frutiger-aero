@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import { openSession as openSessionAt, openDrawer, closeDrawer, isDrawerOpen } from './lib/session.mjs'
 
 const URL = process.argv[2]

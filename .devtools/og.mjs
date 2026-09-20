@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import fs from 'node:fs'
 
 /* The social preview is rendered from the same design system as the page, in a
@@ -8,7 +9,7 @@ import fs from 'node:fs'
    only the page chrome is hidden. */
 const URL = process.argv[2]
 const browser = await launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
-const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 2 })
+const page = await freshPage(browser, { viewport: { width: 1200, height: 630 }, deviceScaleFactor: 2 })
 await page.goto(URL, { waitUntil: 'load' })
 await page.waitForTimeout(2200)
 

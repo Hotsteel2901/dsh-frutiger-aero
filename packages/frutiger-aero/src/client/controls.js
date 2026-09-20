@@ -76,9 +76,70 @@ const CONTROL_LABELS = {
   settings: ['Settings', '设置'],
 }
 
+/**
+ * Substrings that appear in the accessible name of a session row's action
+ * button — `"Session actions for <title>"` / `"会话操作：<标题>"` and the like.
+ *
+ * Only *fragments* are needed, because the label carries the session title:
+ * matching it exactly would mean knowing every session name in advance. The
+ * fragments are lower-cased and matched case-insensitively.
+ */
+const SESSION_ACTION_HINTS = ['session actions', '会话操作', '会话选项']
+
+/**
+ * Labels that open the per-session menu, used to walk *out* of it.
+ *
+ * A row's menu is a sibling of the row inside a portal or popover, so the way
+ * to decide "the tap landed on an entry, not on the row" is to ask whether the
+ * tapped node or any ancestor carries one of these names.
+ */
+const SESSION_ACTION_ENTRY = ['rename', 'fork', 'archive', 'delete', '重命名', '派生', '归档', '删除']
+
 /** The application root; anything outside it is not the product's. */
 function appRoot() {
   return document.getElementById('root')
+}
+
+/**
+ * Is this element a session row in the sidebar?
+ *
+ * Deliberately structural: the row is the product's own `treeitem` inside the
+ * sidebar slot. Anything else that happens to be selectable — a workspace, a
+ * file — is not a session and must not close the drawer when chosen.
+ *
+ * @param element - a candidate node.
+ * @returns whether it is a session row.
+ */
+function isSessionRow(element) {
+  if (!(element instanceof Element)) return false
+  const row = element.closest('[role="treeitem"]')
+  if (row === null) return false
+  const sidebar = appRoot()?.querySelector('[data-slot="sidebar"]')
+  if (sidebar === null || sidebar === undefined) return false
+  return sidebar.contains(row)
+}
+
+/**
+ * Did this node come from inside a session row's action menu?
+ *
+ * The menu is portal-rendered, so it is *not* a descendant of the row; the test
+ * therefore walks up from the tapped node looking for a `menuitem` (or a plain
+ * button) whose name is one of the menu's entries. Without this, tapping
+ * "Rename" would also close the drawer, turning one intent into two effects.
+ *
+ * @param element - the node the tap landed on.
+ * @returns whether the tap belongs to the row's menu rather than the row.
+ */
+function isSessionActionEntry(element) {
+  if (!(element instanceof Element)) return false
+  for (let node = element; node !== null; node = node.parentElement) {
+    const tag = node.tagName
+    const interactive = tag === 'BUTTON' || node.getAttribute('role') === 'menuitem'
+    if (!interactive) continue
+    const name = (node.getAttribute('aria-label') ?? node.textContent ?? '').trim().toLowerCase()
+    if (SESSION_ACTION_ENTRY.some((hint) => name.includes(hint))) return true
+  }
+  return false
 }
 
 /**

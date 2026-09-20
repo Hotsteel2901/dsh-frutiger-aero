@@ -94,6 +94,53 @@ export async function gateOpen(page) {
  * @param options - `settle` ms after load; `gates` false to inspect the raw boot.
  * @returns `{ gates, errors }` where `errors` are console/page errors seen so far.
  */
+/**
+ * Open the app with a cold cache.
+ *
+ * A plain `browser.newPage()` reuses the browser process's HTTP cache, and the
+ * harness serves every client bundle with
+ *
+ * ```
+ * cache-control: public, max-age=31536000, immutable
+ * ```
+ *
+ * addressed by a `?rev=` query. That is correct and fast in production — the
+ * rev changes whenever the bytes do. In a dev loop it is a trap: the rev the
+ * host hands out at boot is a **startup nonce**, not a content hash, and it is
+ * only replaced once the HMR poll notices the file and re-hashes it. Edit a
+ * bundle inside that window and the URL is byte-identical while the contents
+ * are not, so the engine is entitled to replay its cached copy. Every
+ * measurement after that describes the *previous* build, with a clean console
+ * and no hint that anything is wrong.
+ *
+ * That happened, and it cost a full audit cycle: a fix that was demonstrably
+ * present in `lib/client.js` on disk measured as absent in the page. So the
+ * harness never trusts the cache for a run it is about to draw conclusions
+ * from. `bypassCSP`-style correctness for dev tools, achieved by simply
+ * telling the engine not to store anything.
+ *
+ * @param browser - a launched browser.
+ * @param options - forwarded to `browser.newPage`.
+ * @returns the new page.
+ */
+export async function freshPage(browser, options = {}) {
+  const context = await browser.newContext({ ...options, bypassCSP: true })
+  const page = await context.newPage()
+  // Chromium's `Network.setCacheDisabled` equivalent via CDP: nothing is read
+  // from, or written to, the HTTP cache for this page.
+  const session = await context.newCDPSession(page)
+  await session.send('Network.setCacheDisabled', { cacheDisabled: true })
+  page.__faContext = context
+  return page
+}
+
+/**
+ * Open the app with the first-run gates already cleared.
+ *
+ * @param page - Playwright page.
+ * @param url - the tokenised URL the host printed.
+ * @returns the labels actually clicked, useful for asserting the state was reached.
+ */
 export async function enter(page, url, { settle = 3500, gates = true } = {}) {
   const errors = []
   page.on('pageerror', (e) => errors.push(`PAGEERROR: ${String(e.message).slice(0, 200)}`))

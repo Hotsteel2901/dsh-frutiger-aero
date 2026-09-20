@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 const URL = process.argv[2]
 const browser = await launch({ args: ['--no-sandbox'] })
 

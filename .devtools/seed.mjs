@@ -6,6 +6,7 @@
  * user would, so the state it produces is a state the app really has.
  */
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import fs from 'node:fs'
 
 const URL = process.argv[2]

@@ -20,6 +20,7 @@
  * dock button, a product control, or one the plugin grew.
  */
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 
 const URL = process.argv[2]
 const OUT = process.argv[3] ?? '/tmp/fa-hit'
@@ -143,7 +144,13 @@ const PROBE = `(() => {
 })()`
 
 const browser = await launch()
-const context = await browser.newContext({
+// Through `freshPage`, so the run gets a cold HTTP cache (the bundles are served
+// `immutable` but their `?rev=` is a boot-time nonce, not a content hash — see
+// the note on `freshPage`) and so the viewport is set the same way every other
+// probe sets it. Doing it here by hand is how this file ended up reporting
+// `viewport: 844x844` while every other probe reported the width it was asked
+// for, which quietly turned a phone audit into a tablet one.
+const page = await freshPage(browser, {
   viewport: { width: WIDTH, height: HEIGHT },
   deviceScaleFactor: 3,
   isMobile: true,
@@ -151,7 +158,6 @@ const context = await browser.newContext({
   userAgent:
     'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Mobile Safari/537.36',
 })
-const page = await context.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(String(e.message).slice(0, 200)))
 page.on('console', (m) => {

@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import fs from 'node:fs'
 
 /* Off-centre items that exist **only** with the skin.

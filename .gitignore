@@ -7,3 +7,7 @@ node_modules/
 # Scratch output from the verification runs.
 /tmp/
 *.tmp
+
+# Screenshots the probes drop next to themselves when a run is cut short before
+# its output directory is applied. Only the harness should ever produce these.
+.devtools/*.png

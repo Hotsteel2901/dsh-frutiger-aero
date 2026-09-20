@@ -394,6 +394,36 @@ body[data-fa-drawer] [data-fa-scrim] {
   }
 
   /*
+   * The composer's tool row, for exactly the reason above — and it took a
+   * pixel-level sample to see it, because the failure is invisible from the
+   * box geometry.
+   *
+   * Measured on a 390px phone:
+   *
+   * ```
+   * .uV2eYG_tools   124x28   gap: 12px
+   *   Commands          28x28  @25  →53
+   *   Add attachment    28x28  @65  →93
+   *   Access mode       44x28  @105 →149
+   * ```
+   *
+   * Three controls, 12px apart, carrying 44px halos. Each halo reaches 8px past
+   * its own box, so `Commands` (centre 39) and `Add attachment` (centre 79) are
+   * only 40px apart while both claim 44 — they overlap by 4px, and the sample
+   * shows `Commands` losing exactly its right-hand 4px to its neighbour. The
+   * audit read that as `Commands reach 40x44`, which looks like a rounding
+   * artefact and is not: it is one control stealing from another.
+   *
+   * 36px is what this file already uses for every other strip on a ~36px pitch,
+   * chosen so neighbouring halos meet instead of crossing. The row still gets
+   * more target than the 28px box the product ships, with no overlap.
+   */
+  [class*="tools"] :is(button, [role="button"])::before {
+    width: max(100%, 36px);
+    height: max(100%, 36px);
+  }
+
+  /*
    * iOS Safari zooms the whole page when a focused field's text is under 16px,
    * and the zoom is sticky — the user then has to pinch back out. The composer's
    * own sizing stays intact; only the floor moves.
@@ -763,3 +793,164 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
     display: none !important;
   }
 }
+
+/* ══ Where the halo cannot reach, grow the box ══════════════════════════════
+   The `::before` halo above is the right technique for most of the app: it
+   enlarges the target without moving a single pixel of layout. It has one
+   hard limit, and the sidebar is where it bites — **a pseudo-element cannot
+   escape a clipping ancestor.**
+
+   Measured on a 390px viewport with the drawer open, `View options` sits at
+   `left: 176, right: 204` and carries a correct 44x44 `::before`. Its reach
+   still measures `28x44`, because five ancestors between it and the frame all
+   clip:
+
+   ```
+   .bhn1Oq_search          overflow: hidden
+   .bhn1Oq_sectionHeader   overflow: hidden
+   .hHd-Xa_regionArea      overflow: hidden
+   .pI_x6G_sidebarCol      overflow: hidden
+   .pI_x6G_frame           overflow: hidden
+   ```
+
+   The halo is drawn and then cut off at each of those edges, so the usable
+   target is whatever the innermost clip leaves behind. No amount of `z-index`
+   fixes it — `z-index` orders siblings, and these are ancestors.
+
+   So for controls inside the sidebar's clipping stack the *box* grows instead.
+   That is normally the wrong trade (see the note on `min-width: 44px` above:
+   it moves glyphs off-centre in boxes the product centres from an edge), but
+   it is safe here for a reason worth stating: these are square icon buttons
+   the product centres with `justify-content: center`, so widening the box
+   symmetrically re-centres the glyph rather than displacing it.
+
+   The halo is switched off on these and the box takes over, so a control is
+   never counted twice and never ends up with a 44px box *plus* a 44px halo. */
+
+@media (pointer: coarse) {
+  [data-fa-col="sidebar"] :is(button, [role="button"]):not([class*="iconButton"])::before,
+  [data-fa-col="sidebar"] :is([class*="rowActions"], [class*="sectionHeader"], [class*="search"])
+    :is(button, [role="button"])::before {
+    /* Hand the job to the box; a clipped halo is worse than none, because it
+       reports as present in `getComputedStyle` while catching nothing. */
+    content: none;
+  }
+
+  /*
+   * The section header is a 260px strip holding a label, an icon, a *collapsed
+   * inline search* and an action group. It does not fit, and it does not fit on
+   * desktop either:
+   *
+   * ```
+   * 1280px viewport, stock product, no skin rules in play
+   *   sectionHeader    260x36
+   *     sectionLabel    77x20  @16   "Workspaces"
+   *     searchSlot      28x28  @176  flex: 1 1 0%   ← shrinks to nothing
+   *       searchButton  28x28  @176
+   *       searchInput    6x22  @204  ← a text field six pixels wide
+   *     headerActions   60x28  @208  ← lands *on top of* the slot above
+   * ```
+   *
+   * `headerActions` starts at 208 while `searchSlot` still occupies 176→204,
+   * so the two overlap at the same `y`, and the search field has been squeezed
+   * to six pixels. Giving the buttons a 44px box on a phone then made them
+   * overlap *each other* as well, with the last one running 28px past the
+   * `overflow: hidden` edge of the header.
+   *
+   * So the strip is re-laid-out rather than re-sized. The label keeps its
+   * space, the collapsed search collapses *properly* (its button stays, its
+   * unusable six-pixel input goes), and the action group is allowed to sit at
+   * the end of the row instead of on top of its neighbour.
+   *
+   * `margin-left: auto` is what resolves the overlap: it makes the action
+   * group the flex item that absorbs the slack, so the two groups lay out
+   * sequentially in source order instead of both being positioned from the
+   * collapsed slot.
+   */
+  [data-fa-col="sidebar"] [class*="sectionHeader"] {
+    gap: 6px;
+  }
+
+  /* The collapsed search contributes only its button. The input is 6px wide —
+     too small to read, to place a caret in, or to tap — and leaving it in the
+     flow is what forced the slot to shrink and the groups to collide. Opening
+     the search is the button's job; when it does, the input is given a real
+     box below. */
+  [data-fa-col="sidebar"] [class*="searchSlot"] {
+    flex: 0 0 auto;
+  }
+
+  [data-fa-col="sidebar"] [class*="search"] [class*="searchInput"] {
+    /* Only while collapsed. `:not(:focus)` keeps a keyboard user's field. */
+    display: none;
+  }
+
+  [data-fa-col="sidebar"] [class*="search"]:focus-within [class*="searchInput"],
+  [data-fa-col="sidebar"] [class*="search"][data-open] [class*="searchInput"] {
+    display: block;
+    min-width: 96px;
+  }
+
+  /* The action group takes the remaining space and lays out from the end, so
+     the two groups can never be positioned on top of each other. It still has
+     to *fit*: the stock header's own right padding is not enough for two 36px
+     buttons plus the gap, so the group is inset from the clip edge rather than
+     running through it. Measured before: the last button ended at 282 against
+     a header that clips at 272. */
+  [data-fa-col="sidebar"] [class*="headerActions"] {
+    margin-left: auto;
+    flex: 0 0 auto;
+    padding-right: 10px;
+  }
+
+  [data-fa-col="sidebar"] [class*="headerActions"] :is(button, [role="button"]) {
+    min-width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+
+  [data-fa-col="sidebar"] [class*="searchButton"] {
+    min-width: 36px;
+    min-height: 36px;
+    justify-content: center;
+  }
+
+  /*
+   * The session row's action button gets the full 44px, and it is the one
+   * control here that can afford it: it lives alone at the end of its own row
+   * with nothing beside it to steal from, and on a device without hover it is
+   * the *only* way to reach that row's menu.
+   *
+   * Measured: 44x44, no overlap. But it is not free — the row is 256px and the
+   * button is `flex: 0 0 auto`, so every pixel it takes comes straight out of
+   * the title, which is `flex: 1 1 0%`:
+   *
+   * ```
+   * 44px button →  title 170px  "Frutiger Aero on a phone —"   ← truncated
+   * 16px button →  title 198px  (the product's own hover box)
+   * ```
+   *
+   * So the title gets 28px back by *shifting* the button rather than shrinking
+   * it. The row is `position: relative`-free and the button is a flex item, so
+   * a negative right margin is what pulls the box toward the row's edge: the
+   * glyph inside is centred, so it moves with the box, and the 44px target
+   * stays 44px. The row's own right padding absorbs it.
+   *
+   * The result is a title that reads to `198px` again with a full-size target,
+   * which is the point: on a phone the *name* is what the user is choosing
+   * between, and the menu is the rarer intent.
+   */
+  [data-fa-col="sidebar"] [role="treeitem"] [class*="rowActions"] button {
+    min-width: 44px !important;
+    min-height: 44px !important;
+  }
+
+  /* Pull the action box into the row's trailing padding. Bounded to the row's
+     own inset so the glyph cannot cross the sidebar's `overflow: hidden` edge. */
+  [data-fa-col="sidebar"] [role="treeitem"] [class*="rowActions"] {
+    margin-right: -12px;
+  }
+}
+
+
+

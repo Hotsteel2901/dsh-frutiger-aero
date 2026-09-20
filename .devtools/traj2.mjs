@@ -1,4 +1,5 @@
 import { launch } from './lib/chromium.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 import fs from 'node:fs'
 const URL = process.argv[2]
 const OUT = '/tmp/fa-traj2'

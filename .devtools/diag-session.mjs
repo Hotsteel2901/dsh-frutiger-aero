@@ -15,7 +15,7 @@ import os from 'node:os'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { launch } from './lib/chromium.mjs'
-import { enter } from './lib/gates.mjs'
+import { enter, freshPage } from './lib/gates.mjs'
 
 const URL = process.argv[2]
 const SEED_ID = process.argv[3] ?? 'ses_frutiger_mobile_audit'
@@ -94,7 +94,7 @@ for (const s of inventory()) {
 // Drive the product's own "New session" so it writes a session through its
 // real code path, then read what it produced.
 const browser = await launch()
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 } })
+const page = await freshPage(browser, { viewport: { width: 1280, height: 900 } })
 await enter(page, URL)
 const clicked = await page.evaluate(`(() => {
   const buttons = [...document.querySelectorAll('#root button, #root [role="button"]')]
