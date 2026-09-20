@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import { openSession as openSessionAt, openDrawer, closeDrawer, isDrawerOpen } from './lib/session.mjs'
 
 const URL = process.argv[2]
@@ -7,7 +7,7 @@ const URL = process.argv[2]
 // shipped locales is the regression test for that, so the locale is a parameter
 // rather than a constant.
 const LOCALE = process.argv[3] ?? 'en-US'
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 const results = []
 const check = (name, ok, detail) => { results.push({ name, ok, detail }); console.log((ok ? 'PASS ' : 'FAIL ') + name.padEnd(48) + (detail ?? '')) }
 

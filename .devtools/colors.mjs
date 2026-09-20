@@ -1,6 +1,6 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 const URL = process.argv[2]
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 for (const [name, viewport, mobile] of [['phone', { width: 390, height: 844 }, true], ['desktop', { width: 1440, height: 900 }, false]]) {
   const context = await browser.newContext({ viewport, isMobile: mobile, hasTouch: mobile })
   const page = await context.newPage()

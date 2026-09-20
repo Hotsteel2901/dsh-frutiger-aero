@@ -1,9 +1,9 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import sharp from 'sharp'
 import fs from 'node:fs'
 const URL = process.argv[2]
 fs.mkdirSync('/tmp/fa-lum2', { recursive: true })
-const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const browser = await launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 
 const stats = async (file) => {
   const { data } = await sharp(file).greyscale().raw().toBuffer({ resolveWithObject: true })

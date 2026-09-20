@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 
 /* The social preview is rendered from the same design system as the page, in a
@@ -7,7 +7,7 @@ import fs from 'node:fs'
    installed. The wallpaper is kept — it is the whole point of the card — and
    only the page chrome is hidden. */
 const URL = process.argv[2]
-const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const browser = await launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 2 })
 await page.goto(URL, { waitUntil: 'load' })
 await page.waitForTimeout(2200)

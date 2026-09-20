@@ -1,11 +1,11 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 
 const URL = process.argv[2]
 const OUT = process.argv[3]
 const TIER = process.argv[4] ?? 'full'
 fs.mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const browser = await launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 const log = []
 
 const PROBE = `(() => {

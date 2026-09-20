@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 import { openSession, openTab } from './lib/session.mjs'
 
@@ -6,7 +6,7 @@ const URL = process.argv[2]
 const OUT = '/tmp/fa-traj3'
 fs.mkdirSync(OUT, { recursive: true })
 const PROBE = fs.readFileSync('./probes/trajectory.js', 'utf8')
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 
 for (const [tag, opts] of [['en', { locale: 'en-US' }], ['zh', { locale: 'zh-CN' }]]) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opts })

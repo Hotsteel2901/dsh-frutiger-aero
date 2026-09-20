@@ -1,8 +1,8 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 const URL = process.argv[2]
 fs.mkdirSync('/tmp/fa-bisect', { recursive: true })
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 3 })
 const page = await context.newPage()
 await page.goto(URL, { waitUntil: 'domcontentloaded' })

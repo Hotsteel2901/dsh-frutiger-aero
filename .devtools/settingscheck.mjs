@@ -1,10 +1,10 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 import { openSession } from './lib/session.mjs'
 const URL = process.argv[2]
 const OUT = '/tmp/fa-settings'
 fs.mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 const results = []
 const check = (n, ok, d) => { results.push({ n, ok }); console.log((ok ? 'PASS ' : 'FAIL ') + n.padEnd(52) + (d ?? '')) }
 

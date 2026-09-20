@@ -1,6 +1,6 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 const URL = process.argv[2]
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 
 for (const [tag, opts] of [
   ['en-US', { locale: 'en-US' }],

@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 
 /* The chat header's "open in Files" split button, measured with and without the
  * skin. My coarse-pointer rule puts a 44px floor on every button; if the product
@@ -31,7 +31,7 @@ const probe = `(() => {
   return out
 })()`
 
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 for (const [tag, url, label] of [
   ['stock   ', process.argv[2], 'Open sidebar'],
   ['frutiger', process.argv[3], '打开侧边栏'],

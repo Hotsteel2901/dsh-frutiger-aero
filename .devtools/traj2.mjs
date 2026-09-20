@@ -1,10 +1,10 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 const URL = process.argv[2]
 const OUT = '/tmp/fa-traj2'
 fs.mkdirSync(OUT, { recursive: true })
 const PROBE = fs.readFileSync('./probes/trajectory.js', 'utf8')
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 
 const toggleSidebar = (page) =>
   page.evaluate(`(() => { const m = document.querySelector('#root [data-slot="sidebar.brand.mark"]'); const b = m && m.closest('button'); if (b) { b.click(); return true } return false })()`)

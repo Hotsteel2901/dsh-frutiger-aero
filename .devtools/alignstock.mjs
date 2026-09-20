@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 
 /* The same alignment probe against a **stock** profile.
@@ -9,7 +9,7 @@ import fs from 'node:fs'
  * to find out whether the geometry the skin reports also exists without it. */
 const URL = process.argv[2]
 const PROBE = fs.readFileSync('./probes/alignment.js', 'utf8')
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'en-US' })
 const page = await context.newPage()
 await page.goto(URL, { waitUntil: 'domcontentloaded' })

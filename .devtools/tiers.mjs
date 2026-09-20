@@ -1,9 +1,9 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 const URL = process.argv[2]
 const OUT = '/tmp/fa-tiers'
 fs.mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+const browser = await launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
 const results = []
 for (const [vpName, viewport, mobile] of [['desktop', { width: 1440, height: 900 }, false], ['phone', { width: 390, height: 844 }, true]]) {
   for (const tier of ['full', 'lite', 'off']) {

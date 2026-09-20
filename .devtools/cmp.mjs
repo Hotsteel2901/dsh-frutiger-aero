@@ -1,6 +1,6 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 const [base, after] = process.argv.slice(2)
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 const PROBE = `(() => {
   const t = document.querySelector('[data-conversation-scroll]')
   const flow = document.querySelector('[data-chat-flow]')

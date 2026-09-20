@@ -1,4 +1,4 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 
 /* Off-centre items that exist **only** with the skin.
@@ -9,7 +9,7 @@ import fs from 'node:fs'
  * a *difference*: run the same viewport against a stock profile and keep only
  * what the skin introduces. Everything else is the product being itself. */
 const PROBE = fs.readFileSync('./probes/alignment.js', 'utf8')
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 
 async function scan(url, locale, labels) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale })

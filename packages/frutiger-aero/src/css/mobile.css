@@ -704,3 +704,62 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* ══ Session rows: hover is not an input a thumb has ════════════════════════
+   The sidebar's session row carries its whole action menu — rename, archive,
+   delete — inside a `rowActions` box the product reveals on hover. On a coarse
+   pointer that box stays `display: none`, so the menu button measures 0x0 and
+   the row's actions are simply unreachable: measured, not guessed.
+
+   Two changes, both geometric only:
+
+   1. Reveal the actions on touch. The row already reserves the space in its own
+      layout, so nothing has to be re-measured — the box is simply allowed to
+      take part.
+   2. Stop the row from claiming it is draggable. `draggable="true"` is an HTML5
+      drag source, which no touch browser implements; leaving it on makes the
+      row start a native drag as soon as a finger moves a few pixels, which
+      reads as the tap being swallowed. The product's own pointer handling is
+      what reorders sessions on touch, and it needs the native drag out of the
+      way.
+
+   The actions box is held open by giving it a real box, and the row loses the
+   32px cap the product sets so a finger has something to land on. */
+
+@media (pointer: coarse) {
+  [data-fa-col="sidebar"] [role="treeitem"][draggable] {
+    -webkit-user-drag: none !important;
+    min-height: 44px;
+  }
+
+  /* The product hides the actions box from hover-only input; on touch it is
+     always present, and its button gets the same 44px target as every other
+     control in the app. */
+  [data-fa-col="sidebar"] [role="treeitem"] [class*="rowActions"] {
+    display: inline-flex !important;
+    align-items: center;
+    flex: none;
+  }
+
+  [data-fa-col="sidebar"] [role="treeitem"] [class*="rowActions"] [class*="iconButton"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /*
+   * Drop the timestamp to buy the title ~33px back.
+   *
+   * Measured on a 256px row: the title gets `1 1 0%` of what is left after a
+   * 16px slot, a 33px relative-time and a 16px actions button — 165px, which
+   * truncates a normal session name mid-word. The time is the one part nobody
+   * navigates by, and on a phone the row is already contextualised by the
+   * workspace group above it, so it is the part that goes.
+   *
+   * `display: none` rather than a width, because the row is a flex container
+   * and removing the box returns all 33px to the title in one step.
+   */
+  [data-fa-col="sidebar"] [role="treeitem"] > [class*="time"] {
+    display: none !important;
+  }
+}

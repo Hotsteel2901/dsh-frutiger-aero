@@ -1,10 +1,10 @@
-import { chromium } from 'playwright-core'
+import { launch } from './lib/chromium.mjs'
 import fs from 'node:fs'
 import { openSession } from './lib/session.mjs'
 
 const URL = process.argv[2]
 const PROBE = fs.readFileSync('./probes/alignment.js', 'utf8')
-const browser = await chromium.launch({ args: ['--no-sandbox'] })
+const browser = await launch({ args: ['--no-sandbox'] })
 
 for (const [tag, opts] of [['zh-CN', { locale: 'zh-CN' }], ['en-US', { locale: 'en-US' }]]) {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, ...opts })
