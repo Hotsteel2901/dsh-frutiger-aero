@@ -88,6 +88,9 @@ run "keyboard inset" node "$HERE/keyboard.mjs" "$URL"
 
 run "settings dialog (zh + en + desktop)" node "$HERE/settingscheck.mjs" "$URL"
 
+echo "── plugin behaviour ──────────────────────────────────────────────"
+run "wallpaper density control" node "$HERE/bubbles.mjs" "$URL"
+
 echo "── resources ─────────────────────────────────────────────────────"
 run "no unexpected 4xx/5xx" node "$HERE/netcheck.mjs" "$URL"
 

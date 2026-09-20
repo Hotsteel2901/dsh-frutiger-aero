@@ -593,6 +593,10 @@ window.__ModuleLoader__.load({
 		  const root = document.createElement('div')
 		  root.className = 'fa-scene'
 		  root.dataset.faScene = ''
+		  // Recorded so the runtime can tell whether a density change actually needs to
+		  // rebuild the scene, rather than rebuilding on every toggle and flashing the
+		  // wallpaper for a no-op.
+		  root.dataset.faBubbles = String(count)
 		  root.setAttribute('aria-hidden', 'true')
 
 		  const layers = [
@@ -938,9 +942,33 @@ window.__ModuleLoader__.load({
 		/** Preference keys, deliberately namespaced so nothing else can collide. */
 		const FA_STORE_KEY = 'frutiger-aero:effects'
 		const FA_SCENE_KEY = 'frutiger-aero:scene'
+		const FA_BUBBLE_KEY = 'frutiger-aero:bubbles'
 
-		/** Bubbles per tier — the only population that scales with device class. */
+		/** Bubbles per tier — the baseline population for a device class. */
 		const FA_BUBBLES = { full: 22, lite: 10, off: 0 }
+
+		/**
+		 * User-facing density steps.
+		 *
+		 * The tier already decides a sensible *default* count, but "sensible default"
+		 * is not the same as "what this person wants". A user on a phone may want the
+		 * wallpaper to be busier, and a user on a 32-core desktop may find 22 bubbles
+		 * restless while they read. So the count is a preference with the tier as its
+		 * default, and the multipliers are applied to the tier's baseline rather than
+		 * replacing it — that keeps the tier meaningful (a `lite` device still gets a
+		 * `lite` population) while letting the user push it in either direction.
+		 *
+		 * `calm` is deliberately not `0`: a scene with no bubbles at all is a different
+		 * wallpaper, and that is already what the scene toggle is for.
+		 */
+		const FA_BUBBLE_DENSITY = {
+		  calm: 0.45,
+		  normal: 1,
+		  lively: 1.8,
+		}
+
+		/** Density steps in display order, for the control surface. */
+		const FA_BUBBLE_STEPS = Object.keys(FA_BUBBLE_DENSITY)
 
 		/** `exports.inject` — the plugin needs no service, so it activates immediately. */
 		const inject = []
@@ -1047,6 +1075,30 @@ window.__ModuleLoader__.load({
 		      tag.remove()
 		    }
 		  }, `frutiger-aero: ${id} stylesheet`)
+		}
+
+		/**
+		 * How many bubbles to build, given the active tier and the user's preference.
+		 *
+		 * Three sources, in precedence order: the `?bubbles=` query parameter (so a
+		 * screenshot or a bug report can name a count exactly), the stored preference,
+		 * and the tier baseline. The result is clamped to a floor of 3 and a ceiling of
+		 * 48 — a floor so the wallpaper never loses its defining feature by accident,
+		 * a ceiling because past roughly forty composited layers the gains stop being
+		 * visible and the cost does not.
+		 *
+		 * @param tier - the active performance tier.
+		 * @returns bubble count, or 0 when there is no scene to put them in.
+		 */
+		function bubbleCount(tier) {
+		  const baseline = FA_BUBBLES[tier] ?? FA_BUBBLES.lite
+		  if (baseline === 0) return 0
+
+		  const requested = queryPreference('bubbles') ?? readPreference(FA_BUBBLE_KEY)
+		  const multiplier = requested === undefined ? 1 : FA_BUBBLE_DENSITY[requested]
+		  if (multiplier === undefined) return baseline
+
+		  return Math.max(3, Math.min(48, Math.round(baseline * multiplier)))
 		}
 
 		/**
@@ -1694,13 +1746,38 @@ window.__ModuleLoader__.load({
 		  installPaletteService(ctx)
 
 		  // ── the scene ────────────────────────────────────────────────────────────
+		  // Owned by a small controller rather than built inline, because the bubble
+		  // count is a live preference: changing it has to rebuild the scene, and the
+		  // rebuild has to reuse the same deterministic seed so the wallpaper keeps its
+		  // composition instead of reshuffling under the user.
 		  const sceneEnabled = queryPreference('scene') !== 'off' && readPreference(FA_SCENE_KEY) !== 'off'
-		  if (sceneEnabled && tier !== 'off') {
+
+		  /** Rebuild the scene from the current tier and density. */
+		  const renderScene = () => {
+		    const existing = document.querySelector('[data-fa-scene]')
+		    const wanted = sceneWanted() && classifyTier() !== 'off'
+		    if (!wanted) {
+		      existing?.remove()
+		      return false
+		    }
+		    const count = bubbleCount(classifyTier())
+		    // A rebuild is only needed when the count actually changed: the scene is
+		    // expensive to build and a no-op toggle should not flash the wallpaper.
+		    if (existing !== null && existing.dataset.faBubbles === String(count)) return true
+		    const scene = createScenery(count)
+		    if (existing === null) document.body.append(scene)
+		    else existing.replaceWith(scene)
+		    return true
+		  }
+
+		  /** Whether the user currently wants a wallpaper at all. */
+		  const sceneWanted = () => queryPreference('scene') !== 'off' && readPreference(FA_SCENE_KEY) !== 'off'
+
+		  if (sceneWanted() && tier !== 'off') {
 		    ctx.effect(() => {
-		      const scene = createScenery(FA_BUBBLES[tier] ?? FA_BUBBLES.lite)
-		      document.body.append(scene)
+		      renderScene()
 		      return () => {
-		        scene.remove()
+		        document.querySelector('[data-fa-scene]')?.remove()
 		      }
 		    }, 'frutiger-aero: wallpaper')
 		  }
@@ -1714,10 +1791,17 @@ window.__ModuleLoader__.load({
 		  const rerender = () => {
 		    const next = classifyTier()
 		    const current = document.documentElement.dataset.faTier
-		    if (next === current) return
-		    for (const name of ['fa-tier-full', 'fa-tier-lite', 'fa-tier-off']) root.classList.remove(name)
-		    root.classList.add(`fa-tier-${next}`)
-		    root.dataset.faTier = next
+		    const changed = next !== current
+		    if (changed) {
+		      for (const name of ['fa-tier-full', 'fa-tier-lite', 'fa-tier-off']) root.classList.remove(name)
+		      root.classList.add(`fa-tier-${next}`)
+		      root.dataset.faTier = next
+		    }
+		    // The tier governs the bubble *baseline*, so a tier change moves the scene
+		    // even when the density preference did not. `renderScene` is a no-op when
+		    // the resolved count is unchanged, so calling it unconditionally is safe.
+		    renderScene()
+		    return changed
 		  }
 
 		  installFrameGovernor(ctx, tier, (lowered) => {
@@ -1727,7 +1811,7 @@ window.__ModuleLoader__.load({
 		  })
 
 		  installControlSurface(ctx, {
-		    version: '1.0.0',
+		    version: '1.1.0',
 		    tier: () => document.documentElement.dataset.faTier,
 		    setEffects(effects) {
 		      if (effects === 'off' || effects === 'lite' || effects === 'full') writePreference(FA_STORE_KEY, effects)
@@ -1737,10 +1821,38 @@ window.__ModuleLoader__.load({
 		    },
 		    setScene(enabled) {
 		      writePreference(FA_SCENE_KEY, enabled === false ? 'off' : 'on')
-		      const existing = document.querySelector('[data-fa-scene]')
-		      if (enabled === false) existing?.remove()
-		      else if (existing === null && classifyTier() !== 'off') document.body.append(createScenery(FA_BUBBLES[classifyTier()] ?? FA_BUBBLES.lite))
-		      return enabled !== false
+		      renderScene()
+		      return sceneWanted()
+		    },
+		    /**
+		     * Wallpaper bubble density — `calm`, `normal` or `lively`.
+		     *
+		     * Exposed because the right answer depends on the person and the screen,
+		     * not on the device class: the tier picks a defensible default and this
+		     * lets the user disagree with it. Returns the resolved state so a caller
+		     * can render a control without re-deriving it.
+		     */
+		    bubbles(step) {
+		      if (step === undefined) {
+		        return {
+		          step: readPreference(FA_BUBBLE_KEY) ?? 'normal',
+		          steps: FA_BUBBLE_STEPS,
+		          count: document.querySelectorAll('[data-fa-bubble]').length,
+		        }
+		      }
+		      if (!FA_BUBBLE_STEPS.includes(step)) {
+		        throw new Error(
+		          `frutiger-aero: unknown bubble density ${JSON.stringify(step)}; expected one of ${FA_BUBBLE_STEPS.join(', ')}`,
+		        )
+		      }
+		      if (step === 'normal') writePreference(FA_BUBBLE_KEY, '')
+		      else writePreference(FA_BUBBLE_KEY, step)
+		      renderScene()
+		      return {
+		        step,
+		        steps: FA_BUBBLE_STEPS,
+		        count: document.querySelectorAll('[data-fa-bubble]').length,
+		      }
 		    },
 		    tag: () => {
 		      const frame = document.querySelector('[data-fa-frame]')

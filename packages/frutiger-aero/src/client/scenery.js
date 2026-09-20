@@ -77,6 +77,10 @@ function createScenery(count) {
   const root = document.createElement('div')
   root.className = 'fa-scene'
   root.dataset.faScene = ''
+  // Recorded so the runtime can tell whether a density change actually needs to
+  // rebuild the scene, rather than rebuilding on every toggle and flashing the
+  // wallpaper for a no-op.
+  root.dataset.faBubbles = String(count)
   root.setAttribute('aria-hidden', 'true')
 
   const layers = [

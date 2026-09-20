@@ -136,7 +136,25 @@ authenticated session cookie.
 window.__FRUTIGER__.setEffects('lite')   // 'full' | 'lite' | 'off'
 window.__FRUTIGER__.setScene(false)      // wallpaper only
 window.__FRUTIGER__.tier()               // what is active right now
+
+window.__FRUTIGER__.bubbles()            // { step, steps, count }
+window.__FRUTIGER__.bubbles('calm')      // 'calm' | 'normal' | 'lively'
 ```
+
+**Wallpaper density.** The tier picks a sensible *default* number of bubbles for your device, and
+`bubbles()` lets you disagree with it without turning the wallpaper off:
+
+| step | effect | on a `full` tier | on a `lite` tier |
+| --- | --- | --- | --- |
+| `calm` | about half as many | 10 | 5 |
+| `normal` | the tier default | 22 | 10 |
+| `lively` | nearly twice as many | 40 | 18 |
+
+The multipliers apply to the tier's baseline rather than replacing it, so a `lite` device stays
+`lite` at every step. The count is clamped to 3–48 either way. Changing it rebuilds the scene but
+not the *composition* — bubble placement comes from a fixed seed, so the wallpaper you chose is
+the one you keep. The preference is stored per browser, survives a reload, and a sticky-hands
+click on `normal` clears the stored value rather than pinning today's default.
 
 …or straight from the URL:
 
@@ -144,10 +162,12 @@ window.__FRUTIGER__.tier()               // what is active right now
 http://127.0.0.1:3099/?frutiger=off       # no decoration at all
 http://127.0.0.1:3099/?frutiger=lite      # palette and layout, no blur, 10 bubbles
 http://127.0.0.1:3099/?frutiger=full      # force the top tier and skip the governor
+http://127.0.0.1:3099/?bubbles=calm       # a quieter wallpaper, stored setting untouched
 ```
 
 The URL form is read on every load *after* the token exchange, so bookmark the clean URL rather
-than the one `dsh` prints.
+than the one `dsh` prints. A query parameter always beats the stored preference, which makes
+`?bubbles=` the right tool for a screenshot or a bug report that needs an exact count.
 
 **Disable the row, keep the package.** In `<profile>/cordis.patch.yml`:
 

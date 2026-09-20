@@ -4,6 +4,104 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-20
+
+### Added
+
+- **Wallpaper density control.** `window.__FRUTIGER__.bubbles()` reads the
+  current step and the live bubble count; `bubbles('calm' | 'normal' | 'lively')`
+  changes it. The multipliers apply to the tier's baseline rather than replacing
+  it, so a `lite` device stays `lite` at every step, and the result is clamped
+  to 3–48. `?bubbles=calm` on the URL overrides a stored preference without
+  disturbing it, which is what a bug report needs.
+
+  Two details worth keeping: a change rebuilds the scene but must not reseed it,
+  or the wallpaper reshuffles under the user's cursor — so the generator stays
+  deterministic and the runtime compares the resolved count before rebuilding,
+  making a no-op toggle actually free. And selecting `normal` *clears* the
+  stored key rather than storing the string `'normal'`, so a later change to the
+  default is not pinned by stale state.
+
+- **`devtools/run-suite.sh`** — the whole verification suite as one command with
+  one verdict. Ten suites, ~11 minutes, non-zero on any failure: contrast in
+  both schemes, the accent tokens actually being live, an eleven-viewport layout
+  sweep, touch targets, the session row and drawer, the keyboard inset, the
+  settings dialog across zh-CN / en-US / desktop, the density control, and
+  unexpected network failures.
+
+- **`devtools/keyboard.mjs`** — the software-keyboard path had never been
+  verified, because Playwright has no keyboard. It simulates one by shadowing
+  the *live* `visualViewport` instance's accessors and dispatching `resize`, so
+  the plugin's own subscription is what runs. 14/14: the composer lifts clear of
+  the occluded band, the dock leaves with `opacity: 0` and no pointer events, a
+  60px inset correctly does *not* raise the flag, and everything unwinds.
+
+- **`devtools/netcheck.mjs`** — lists every request that does not succeed, and
+  re-requests from inside the page, because the Harness gates every route behind
+  a signed cookie that a Node-side request does not carry.
+
+- **`devtools/tokens.mjs`** — reads the live custom properties off `<body>`.
+  A contrast run reporting zero failures is otherwise ambiguous between a fixed
+  palette and a bundle that never reloaded.
+
+- **`devtools/contrast-report.mjs`**, **`devtools/hit-report.mjs`** — turn the
+  two largest probes into something a person can read, leading with failures
+  instead of burying them in a few hundred passing rows.
+
+### Fixed
+
+- **The light scheme failed WCAG AA on two labels.** `Chat` measured 2.97:1 and
+  `Access mode` 3.25:1, against a 4.5:1 requirement. Both traced to a single
+  definition each rather than to any component style:
+
+  - `accent` was `#129dd0`, the palest aqua on the deepseek ramp — an excellent
+    *fill* and a poor *text* colour at 1.82:1 on the worst pane. The fix moved
+    the text-bearing end of the pair down the ramp the product already ships,
+    keeping the hue and buying the contrast.
+  - `caption` was `#6b93ab` at 1.93:1, and was not reachable from any of the
+    four `--dsw-alias-label-*` mappings the skin sets, so a product control was
+    falling through to an undesigned colour.
+
+  The ink ramp is now solved against the surface it actually lands on. That is
+  not white: the app's own panes are 74% white over a wallpaper whose darkest
+  sample is `rgb(18 40 62)`, which composites to `#c1c7cd`. The measured ratios
+  are recorded beside the definition, because that reasoning is the thing that
+  stops a future reader from "correcting" the aqua back to a brighter one.
+
+- **The accent ramp was inverted.** `accent` was lighter than `accentDeep`,
+  which made `link` darker than `button-primary-fill` and lit every hover
+  transition *down* instead of up.
+
+### Changed
+
+- **Three verification defects fixed, each of which had already produced a
+  confident wrong answer.**
+
+  - `shots.mjs` and `settingscheck.mjs` still built their own
+    `browser.newContext`, so the first-run API-key dialog was never dismissed
+    and every screenshot they took was a picture of a modal. Both now go through
+    the gate-passer, and `shots.mjs` gained a `zh-CN` pass, because a label that
+    fits in one language can clip in another.
+  - `openSession` clicked a session row by text and could land on the row that
+    was *already selected*, where a click is a deliberate no-op. It reported
+    "no transcript rendered" on a home whose transcript was fine. It now picks
+    an unselected row and taps it for real, via `touchscreen`, so the path a
+    thumb takes is the path under test.
+  - `deepcontrast.mjs` grew to cover the drawer, the trajectory panel and a
+    1024px width, and now composites the ancestor background stack per element
+    instead of assuming a single colour.
+
+### Known limitations
+
+- `/open-in-app/icon/filemanager` answers **404** on a headless Linux host, and
+  `netcheck.mjs` accepts it by name with the reason. `filemanager` is backed by
+  `xdg-open`, which has no `.desktop` file and therefore no icon; the host
+  returns null, the route correctly answers 404, and the product hides the
+  button. It is stock behaviour, not the skin's — this plugin is a token reskin
+  and neither routes nor serves it.
+
+[1.1.0]: https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.1.0
+
 ## [1.0.2] — 2026-09-19
 
 Three phone-layout defects, all reported from real use.

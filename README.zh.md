@@ -129,7 +129,24 @@ dsh --profile frutiger --port 3099 --no-open
 window.__FRUTIGER__.setEffects('lite')   // 'full' | 'lite' | 'off'
 window.__FRUTIGER__.setScene(false)      // 只关壁纸
 window.__FRUTIGER__.tier()               // 当前生效档位
+
+window.__FRUTIGER__.bubbles()            // { step, steps, count }
+window.__FRUTIGER__.bubbles('calm')      // 'calm' | 'normal' | 'lively'
 ```
+
+**壁纸密度。** 档位会按设备选一个合理的**默认**气泡数，`bubbles()` 让你在不放弃整张壁纸的前提下
+否决它：
+
+| 档位 | 效果 | 最高档设备 | 轻量档设备 |
+| --- | --- | --- | --- |
+| `calm` | 约一半 | 10 | 5 |
+| `normal` | 档位默认 | 22 | 10 |
+| `lively` | 接近两倍 | 40 | 18 |
+
+倍率是乘在**档位基线**上的，不是替换它，所以轻量档设备在任何密度下都还是轻量档。数量被限制在
+3–48 之间。改密度会重建场景但**不重排构图** —— 气泡位置来自固定种子，你选中的壁纸就是你留下
+的那一张。偏好按浏览器保存，刷新后仍在；在 `normal` 上再点一次会**清空**存储值，而不是把今天
+的默认值钉死。
 
 或者直接用地址栏参数：
 
@@ -137,10 +154,12 @@ window.__FRUTIGER__.tier()               // 当前生效档位
 http://127.0.0.1:3099/?frutiger=off       # 完全不要装饰
 http://127.0.0.1:3099/?frutiger=lite      # 保留配色与布局，关模糊，10 个气泡
 http://127.0.0.1:3099/?frutiger=full      # 强制最高档，跳过帧率治理
+http://127.0.0.1:3099/?bubbles=calm       # 安静一点的壁纸，不动已保存的设置
 ```
 
 地址参数是在 token 校验**之后**读取的，所以请收藏干净的地址，
-而不是 `dsh` 打印出来的那一条。
+而不是 `dsh` 打印出来的那一条。地址参数永远优先于已保存的偏好，所以需要精确数量的截图或
+问题复现，用 `?bubbles=` 最合适。
 
 **只禁用这一行，保留安装。** 在 `<profile>/cordis.patch.yml` 里：
 
