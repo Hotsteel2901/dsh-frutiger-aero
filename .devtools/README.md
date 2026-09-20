@@ -29,6 +29,8 @@ node landing.mjs http://127.0.0.1:8099/index.html # the GitHub Pages page
 | `docktest.mjs <url>` | the phone dock, both locales: 24 assertions |
 | `trajcheck.mjs <url>` | the Trajectory view on a phone and on the desktop: 11 assertions |
 | `settingscheck.mjs <url>` | the settings dialog opened from the dock — both locales, phone and desktop: 23 assertions |
+| `clipaudit.mjs <url>` | whether any **visible** label is cut off, across the chat, drawer, settings dialog and right panel |
+| `run-suite.sh <url>` | everything above that can run unattended, as one command with one verdict |
 | `aligndiff.mjs <stock-url> <skin-url>` | off-centre controls **introduced by the skin**. The raw metric flags left-aligned content, which the product is full of; only the difference is actionable |
 | `alignstock.mjs <stock-url>` | the same alignment probe against a stock profile, driven by stock's own controls |
 | `final.mjs <url> <out> [tier]` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |
@@ -64,7 +66,32 @@ That is how the two product-level mobile defects this package fixes were found: 
 transcript is **108px** wide on a 390px phone, and the conversation's `clamp(680px, …)` reading
 measure is wider than the viewport.
 
-## Four traps, and what each one cost
+## Traps, and what each one cost
+
+**If a claim is about what a user sees, measure what is rendered.** A whole class of confident
+wrong answers here came from querying properties that *sound* like the question and are not.
+
+| query | reports | actually means |
+| --- | --- | --- |
+| `scrollWidth > clientWidth` | a clip | includes absolutely-positioned descendants and scroll room: fires on a 20px close button (32) and a fine tab strip (392/390) |
+| `textContent === 'Files'` on a leaf | not found | a label whose node also has element children never matches, so the search returns nothing and reads as a pass |
+| `clientWidth` | `0` | always `0` on `display: inline`; comparing a text width against it flags every inline run |
+| `getBoundingClientRect()` is `0x0` | not rendered | true for a hidden frame — and for `display: contents`, which generates no box *by design* and lays its children out in the grandparent |
+| the element you found is the one you meant | — | the desktop frame stays mounted at phone widths, so a `0x0` twin of the same label sits there answering every question about its size |
+
+The last two compounded into the most expensive one: treating `display: contents` as invisible
+silently discarded *all nine* visible labels in the app, and `clipaudit.mjs` reported a pristine
+**"0 clipped, PASS"** on a tree it had never actually looked at. A green result from a probe you
+have not falsified is worse than no probe — see the *first* version of this audit, which passed
+four surfaces while measuring nothing.
+
+The honest test for clipping is the one the browser uses to decide whether to paint an ellipsis:
+lay the text out in a `Range`, and compare that width against the content box of the ancestor that
+owns the `overflow`. Then exclude what is *correctly* clipped — the `clip: rect(0 0 0 0)` screen-
+reader pattern — by recognising the mechanism rather than a hashed class name, and check the whole
+ancestor chain, because one bundle nests a `display: contents` wrapper inside the clipped span.
+
+## The traps, and what each one cost
 
 **A mounted overlay is not a visible one.** The product keeps the right panel mounted while
 closed, slid off-screen with `visibility: hidden`, so its `getBoundingClientRect().height` stays

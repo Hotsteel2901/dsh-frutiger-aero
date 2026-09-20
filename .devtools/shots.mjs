@@ -94,12 +94,21 @@ await shot('phone-light-zh', PHONE, 3, true, async (p) => { await p.waitForTimeo
 await shot('phone-dark-zh', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Dark', 'zh-CN')
 await shot('phone-drawer', PHONE, 3, true, async (p) => { await openDrawer(p) }, 'Light')
 await shot('phone-drawer-zh', PHONE, 3, true, async (p) => { await openDrawer(p) }, 'Light', 'zh-CN')
-await shot('phone-preview', PHONE, 3, true, async (p) => {
-  const link = p.locator('[data-fa-canvas] button:has-text("install.mjs")').first()
-  await link.scrollIntoViewIfNeeded().catch(() => {})
-  await p.waitForTimeout(800)
-  const b = await link.boundingBox()
-  if (b) { await p.touchscreen.tap(Math.round(b.x + b.width / 2), Math.round(b.y + b.height / 2)); await p.waitForTimeout(3200) }
+// The right panel is a full-screen surface on a phone — a file browser, a diff,
+// a document — and it is where the dock's "stays for navigation" rule applies.
+// Opened from the chat header rather than by looking for a filename in the
+// transcript: the previous version matched on `install.mjs`, which made the
+// shot depend on a session body that changes, and then waited 30s and failed
+// when it did.
+await shot('phone-panel', PHONE, 3, true, async (p) => {
+  await p.evaluate(`(() => {
+    const root = document.getElementById('root')
+    const btn = ['Collapse right sidebar', 'Expand right sidebar', '收起右侧栏', '展开右侧栏']
+      .map((n) => root.querySelector('[aria-label=' + JSON.stringify(n) + ']'))
+      .find(Boolean)
+    if (btn) btn.click()
+  })()`)
+  await p.waitForTimeout(3200)
 }, 'Light')
 await browser.close()
 console.log('done')

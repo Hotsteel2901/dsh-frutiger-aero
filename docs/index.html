@@ -681,6 +681,30 @@
 
             <details class="qa glass reveal">
               <summary>
+                <span data-lang-block="en">Can I change the wallpaper without turning it off?</span>
+                <span data-lang-block="zh">能只改壁纸，而不是整个关掉吗？</span>
+              </summary>
+              <p data-lang-block="en">
+                Yes. The bubble population is a preference:
+                <code>window.__FRUTIGER__.bubbles('calm')</code> for about half as many,
+                <code>'lively'</code> for nearly twice as many, <code>'normal'</code> for the
+                device's default. The multipliers apply to the tier's baseline, so a light device stays
+                light at every step, and the count is clamped to 3–48. Changing it rebuilds the scene
+                but not the <em>composition</em> — bubble placement comes from a fixed seed, so the
+                wallpaper you chose is the one you keep. <code>?bubbles=calm</code> does the same from
+                the URL and leaves the stored setting alone.
+              </p>
+              <p data-lang-block="zh">
+                可以。气泡数量是一个偏好项：<code>window.__FRUTIGER__.bubbles('calm')</code> 约减半，
+                <code>'lively'</code> 接近两倍，<code>'normal'</code> 回到设备默认。倍率乘在档位
+                基线上，所以轻量档设备在任何密度下都还是轻量档，数量限制在 3–48。
+                改密度会重建场景但不重排<em>构图</em> —— 气泡位置来自固定种子，你选中的壁纸就是你
+                留下的那一张。地址栏的 <code>?bubbles=calm</code> 效果相同，且不动已保存的设置。
+              </p>
+            </details>
+
+            <details class="qa glass reveal">
+              <summary>
                 <span data-lang-block="en">Which clients does it work with?</span>
                 <span data-lang-block="zh">支持哪些客户端？</span>
               </summary>

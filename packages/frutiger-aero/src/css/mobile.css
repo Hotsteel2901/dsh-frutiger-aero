@@ -1024,6 +1024,89 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
   [data-fa-col="sidebar"] [role="treeitem"] [class*="rowActions"] {
     margin-right: -12px;
   }
+
+  /*
+   * The right panel's tab strip puts its close button on top of its own title.
+   *
+   * Measured on a 390px phone, with the panel open on a file browser:
+   *
+   * ```
+   * .tabTitle   20 → 80   (60px; holds a 16px icon at 20-36 and the
+   *                        label's text at 41-68)
+   * .tabClose   76 → 96   (20px)
+   *                        ^ the close button starts 4px inside the title
+   * ```
+   *
+   * The tab is `display: flex` with `padding: 0 10px` and no `gap`, and both
+   * children are laid out edge to edge — so the icon, the label and the close
+   * button are competing for the same pixels, and the close button wins because
+   * it paints later. The label's own box reports `scrollWidth == clientWidth`,
+   * so nothing flags it as clipped: the text is intact, and the *box* it lives
+   * in is overlapped. It reads as "File" rather than "Files" on screen, and it
+   * gets worse as the label grows — a longer filename, or Chinese, which is
+   * wider per glyph.
+   *
+   * This is stock layout, not something the reskin introduced: the plugin never
+   * styles these nodes, and the classes are hashed host classes. It is fixed
+   * here anyway because it is a visible defect on the surface the user asked to
+   * be made to work, and scoping it to the tab strip cannot reach anything else.
+   *
+   * The fix is a `gap` on the tab rather than more padding, so the two children
+   * stop at the boundary instead of crossing it, and the title keeps the room
+   * the label actually needs.
+   */
+  [class*="_tab_"] {
+    gap: 6px !important;
+  }
+
+  /* A tab is a target as well as a label, and 28px is short for a thumb. */
+  [role="tab"][class*="_tab_"] {
+    min-height: 36px !important;
+  }
+
+  /*
+   * The right panel is see-through on a phone: the conversation reads straight
+   * through it.
+   *
+   * The host gives the panel `background: var(--dsw-alias-bg-base)`, which on a
+   * desktop is opaque enough to sit beside a solid frame. This skin redefines
+   * that alias to the *canvas* colour — `rgb(244 251 255 / 88%)` in light,
+   * `rgb(7 32 46 / 90%)` in dark — because the conversation canvas is meant to
+   * be translucent glass over the wallpaper. Reusing the one token for both is
+   * fine while the panel is a 360px column beside the content and not fine at
+   * all when it is a full-screen overlay: 12% of the transcript underneath
+   * shows through a surface that has no blur to excuse it, and the result reads
+   * as two pages printed on the same sheet.
+   *
+   * The fix is the one this file already uses for the trajectory gutter — pair
+   * the translucent surface with the blur that makes it legible — rather than
+   * making the panel opaque, which would punch a flat rectangle out of the
+   * wallpaper and lose the glass the whole skin is built on. 24px is heavy
+   * enough to dissolve body text at this distance.
+   *
+   * Scoped to the two narrow breakpoints, where the panel becomes an overlay.
+   * At ≥1024px it is a column in the grid and the stock behaviour is correct.
+   */
+  .P3OORG_panel {
+    backdrop-filter: blur(24px) saturate(1.5);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+  }
+
+  /* Below the top tier the blur is the most expensive thing on the screen, so
+     the panel falls back to a solid fill instead — the same trade the
+     trajectory gutter makes, for the same reason.
+
+     It has to be a literal, not a token: every surface the skin defines is
+     deliberately translucent (the layers run 74% / 84% / 92%), which is the
+     whole aesthetic, so there is nothing in the set to fall back *to*. This is
+     the canvas colour at full alpha, which keeps the hue and the brightness and
+     drops only the transparency that was causing the problem. */
+  html.fa-tier-lite .P3OORG_panel,
+  html.fa-tier-off .P3OORG_panel {
+    background: var(--fa-panel-solid);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
 }
 
 

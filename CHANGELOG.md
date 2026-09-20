@@ -23,11 +23,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   default is not pinned by stale state.
 
 - **`devtools/run-suite.sh`** — the whole verification suite as one command with
-  one verdict. Ten suites, ~11 minutes, non-zero on any failure: contrast in
+  one verdict. Eleven suites, ~12 minutes, non-zero on any failure: contrast in
   both schemes, the accent tokens actually being live, an eleven-viewport layout
   sweep, touch targets, the session row and drawer, the keyboard inset, the
-  settings dialog across zh-CN / en-US / desktop, the density control, and
-  unexpected network failures.
+  settings dialog across zh-CN / en-US / desktop, label clipping, the density
+  control, and unexpected network failures.
+
+- **`devtools/clipaudit.mjs`** — measures whether any visible label is actually
+  cut off, by laying each text run out in a `Range` and comparing its width with
+  the content box of the ancestor that clips it. 119 runs across the chat, the
+  drawer, the settings dialog and the right panel; all clean.
+
+  It exists because four separate "the label is clipped" findings went the wrong
+  way, every one of them a defect in the *measurement*:
+
+  - `scrollWidth > clientWidth` reports a clip on a 20px close button (32) and on
+    a tab strip (392/390), because both include absolutely-positioned descendants
+    and scroll room that have nothing to do with the text.
+  - `textContent` equality on a leaf node never matches a label whose node also
+    has element children, so the search returns nothing and reads as a pass.
+  - `clientWidth` is `0` on a `display: inline` element, so comparing a measured
+    text width against it flags every inline run in the product.
+  - the *invisible* fourth one is the instructive one: a `0x0` bounding box means
+    "not rendered" — except under `display: contents`, which generates no box at
+    all by design and lets its children lay out in the grandparent. Treating that
+    as invisible silently discarded all nine visible labels in the app and
+    reported a pristine **"0 clipped, PASS"** on a tree it had never looked at.
+
+  Two genuine matches did surface, in the app's own breadcrumb and close buttons.
+  Both turned out to be the standard screen-reader pattern —
+  `clip: rect(0 0 0 0); width: 1px; height: 1px` — which is correct, so the audit
+  now recognises that *mechanism* rather than a class name, and tests the whole
+  ancestor chain rather than only the immediate parent, because one bundle nests
+  a `display: contents` wrapper inside the clipped span.
 
 - **`devtools/keyboard.mjs`** — the software-keyboard path had never been
   verified, because Playwright has no keyboard. It simulates one by shadowing
@@ -71,6 +99,63 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **The accent ramp was inverted.** `accent` was lighter than `accentDeep`,
   which made `link` darker than `button-primary-fill` and lit every hover
   transition *down* instead of up.
+
+- **Six controls on the landing page were under the 44px touch minimum.** The
+  existing rule set a `min-height` but no `min-width`, so the header pair passed
+  it while staying far too narrow to aim at: the droplet mark measured `26x44`
+  and the scheme glyph `36x44`. The four footer links measured `16px` tall — a
+  third of the minimum — and had been excluded on the reasoning that prose links
+  are read rather than aimed at. That holds for a link mid-sentence; it does not
+  hold for the footer's navigation row, whose only purpose is to be tapped.
+  Both now carry a real 44px box, and the landing page's own probe confirms it
+  independently: its minimum measured tap target went **16px → 44px**, with the
+  desktop layout unchanged and all 19 landing checks still passing.
+
+- **The right panel was see-through on a phone.** The host paints it with
+  `background: var(--dsw-alias-bg-base)`, which is fine on a desktop where the
+  panel is a column beside solid content — but this skin redefines that alias to
+  the *canvas* colour, `rgb(244 251 255 / 88%)` in light and
+  `rgb(7 32 46 / 90%)` in dark, because the conversation canvas is meant to be
+  translucent glass over the wallpaper. Reusing one token for both is harmless
+  at 88% beside a frame; it is not harmless when the panel is a **full-screen
+  overlay**. The transcript underneath showed through a surface that had no blur
+  to excuse it, so the panel read as two pages printed on the same sheet.
+
+  Measured before the fix, with the panel settled at `opacity: 1` and
+  `visibility: visible`: `background: rgba(244, 251, 255, 0.88)`,
+  `backdrop-filter: none`. After: `rgb(244, 251, 255)`, fully opaque.
+
+  The fix follows the precedent already in `mobile.css` for the trajectory
+  gutter — pair the translucent surface with the blur that makes it legible, so
+  the glass survives — and falls back to a solid fill below the top tier, where
+  a 24px backdrop filter is the most expensive thing on the screen. That
+  fallback needs a literal rather than a token: every surface this skin defines
+  is deliberately translucent (74% / 84% / 92%), so `--fa-panel-solid` was added
+  to the material layer at the canvas hue and full alpha.
+
+- **The right panel's close button sat on top of its own tab title.** The tab is
+  `display: flex` with `padding: 0 10px` and no `gap`, so the icon, the label and
+  the close button were laid out edge to edge and the close button won, painting
+  4px inside the title's box:
+
+  ```
+  .tabTitle   20 → 80      (16px icon at 20-36, label text at 41-68)
+  .tabClose   76 → 96      ← starts 4px inside the title
+  ```
+
+  Nothing flagged it: the label's own box reports `scrollWidth == clientWidth`,
+  so its text is intact — it is the *box* that is overlapped. On screen it reads
+  as `File` rather than `Files`, and it degrades as the label grows, which is
+  worst for Chinese, where every glyph is wider. A `gap: 6px` on the tab stops
+  the two children at the boundary instead of crossing it; measured overlap went
+  from **+4px** to **−2px**, and the tab's height from 28px to 36px so it is a
+  target as well as a label.
+
+  Both of these are stock layout, not regressions the reskin introduced — the
+  plugin never styled either node, and the classes are hashed host classes. They
+  are fixed here because they are visible defects on the surface that was asked
+  to be made to work, and both fixes are scoped to the two narrow breakpoints,
+  so the desktop grid is untouched.
 
 ### Changed
 

@@ -241,11 +241,11 @@ Everything. The skin is additive:
 [![The dsh desktop layout in the dark scheme](docs/assets/shot-desktop-dark.webp)](docs/assets/shot-desktop-dark.webp)
 
 <details>
-<summary>Settings dialog and the mobile file preview</summary>
+<summary>Settings dialog and the mobile side panel</summary>
 
 <p align="center">
   <img src="docs/assets/shot-settings.webp" width="520" alt="The settings dialog as a large frosted pane over a dimmed, blurred app" />
-  <img src="docs/assets/shot-phone-preview.webp" width="200" alt="A full-screen file preview on a phone, stopping above the floating dock" />
+  <img src="docs/assets/shot-phone-panel.webp" width="200" alt="A full-screen file browser on a phone, an opaque Aero surface above the floating dock" />
 </p>
 
 </details>

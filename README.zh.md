@@ -226,11 +226,11 @@ profile 的 patch 文件是实时重载的，不需要重启。
 [![深色方案下的电脑端 dsh 界面](docs/assets/shot-desktop-dark.webp)](docs/assets/shot-desktop-dark.webp)
 
 <details>
-<summary>设置弹窗与手机端文件预览</summary>
+<summary>设置弹窗与手机端右侧面板</summary>
 
 <p align="center">
   <img src="docs/assets/shot-settings.webp" width="520" alt="设置弹窗：一整块磨砂面板浮在被调暗虚化的应用之上" />
-  <img src="docs/assets/shot-phone-preview.webp" width="200" alt="手机上的全屏文件预览，在浮动 dock 之上收边" />
+  <img src="docs/assets/shot-phone-panel.webp" width="200" alt="手机上的全屏文件浏览器，不透明的 Aero 面板浮在 dock 之上" />
 </p>
 
 </details>

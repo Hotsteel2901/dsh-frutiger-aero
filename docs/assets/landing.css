@@ -1273,10 +1273,18 @@ html[data-lang='zh'] [data-lang-block='en'] {
 }
 
 /* ══ Touch targets ══════════════════════════════════════════════════════════
-   A landing page has exactly four controls per viewport, so there is no reason
-   for any of them to be under 44px on a touch device. Inline links inside prose
-   are deliberately excluded — they are read, not aimed at. */
+   A landing page has few controls per viewport, so there is no reason for any
+   of them to be under 44px on a touch device.
 
+   The header pair needs a minimum *width* as well as a height: the droplet
+   mark is 26px and the scheme glyph is a single character, so a height-only
+   rule left them 26x44 and 36x44 — full height, and only half the width a
+   thumb actually needs.
+
+   Inline links inside prose stay excluded: they are read, and forcing a 44px
+   box around a word mid-sentence would reflow the paragraph for no gain. The
+   footer nav is a different case — it is a row of links whose whole purpose is
+   to be tapped, so it gets the same treatment as the header. */
 @media (pointer: coarse) {
   .lang__btn,
   .scheme,
@@ -1285,8 +1293,33 @@ html[data-lang='zh'] [data-lang-block='en'] {
     min-height: 44px;
   }
 
+  .brand,
+  .scheme {
+    min-width: 44px;
+    justify-content: center;
+  }
+
   .lang__btn {
     padding-inline: 14px;
+  }
+
+  /* The footer nav is a row of links whose whole purpose is to be tapped, not
+     prose. Measured at 16px tall on a 390px phone — a third of the minimum.
+     The `·` separators are text nodes between the links, so giving each link a
+     real 44px row does not disturb them. */
+  .footer nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 4px;
+    margin-block: -12px;
+  }
+
+  .footer nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 8px;
   }
 
   a.btn {

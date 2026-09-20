@@ -88,6 +88,8 @@ run "keyboard inset" node "$HERE/keyboard.mjs" "$URL"
 
 run "settings dialog (zh + en + desktop)" node "$HERE/settingscheck.mjs" "$URL"
 
+run "no clipped label text" node "$HERE/clipaudit.mjs" "$URL"
+
 echo "── plugin behaviour ──────────────────────────────────────────────"
 run "wallpaper density control" node "$HERE/bubbles.mjs" "$URL"
 

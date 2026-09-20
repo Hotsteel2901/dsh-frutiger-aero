@@ -419,6 +419,14 @@ const LIGHT_MATERIAL = {
   '--fa-aqua-bottom-hover': '#1389c4',
   '--fa-pane': 'rgb(255 255 255 / 66%)',
   '--fa-pane-strong': 'rgb(255 255 255 / 84%)',
+  /* The canvas colour at full alpha. Every *product* surface the skin defines is
+     deliberately translucent — the layers run 74% / 84% / 92% — which is the
+     aesthetic and is correct everywhere the surface sits over the wallpaper.
+     It is wrong for the right panel on a phone, which is a full-screen overlay
+     on top of the transcript: there the 12% shows the conversation through, and
+     no product token exists that can stop it. So the material layer carries one
+     solid value, at the same hue and brightness as the canvas. */
+  '--fa-panel-solid': '#f4fbff',
   '--fa-blur': '18px',
   '--fa-blur-strong': '28px',
   '--fa-saturate': '1.5',
@@ -443,6 +451,7 @@ const DARK_MATERIAL = {
   '--fa-aqua-bottom-hover': '#0d7099',
   '--fa-pane': 'rgb(13 44 62 / 68%)',
   '--fa-pane-strong': 'rgb(17 53 73 / 86%)',
+  '--fa-panel-solid': '#0a2c40',
   '--fa-blur': '16px',
   '--fa-blur-strong': '26px',
   '--fa-saturate': '1.4',
