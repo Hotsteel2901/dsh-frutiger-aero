@@ -89,12 +89,29 @@ curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main
 irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex
 ```
 
-Both download the latest release, place it in the target profile's `node_modules`, and add it to
-that profile's bundle list. They need nothing but Node — no package manager, no registry, no
-build. Pass a profile name to install somewhere other than `frutiger`:
+Both download a snapshot of this repository, place it in the target profile's `node_modules`, and
+add it to that profile's bundle list. They need nothing but **Node 24 or newer** — no package
+manager, no registry, no build. Pass a profile name to install somewhere other than `frutiger`:
 
 ```sh
 curl -fsSL .../install.sh | sh -s -- --profile aero
+```
+
+> **Why Node 24, and not the 20 this used to ask for.** The Harness CLI dispatches through
+> `if (import.meta.main)`, and that property is unimplemented before Node 24. On 20 and 22 the
+> guard is simply falsy: `dsh` prints **nothing** and exits `0`. That is indistinguishable from a
+> broken install, and it is the single most common reason someone concluded this one was. The
+> installers now refuse to run on an older Node and say so in one sentence instead of leaving you
+> with a CLI that silently does nothing.
+
+The installers default to the **default branch**, not to `releases/latest`. An earlier version did
+the opposite, and it was the source of a second, subtler problem: a release tag is cut at a moment
+in time while `package.json` keeps reporting the branch's version, so tag `1.0.3` and `main` both
+announced `version: 1.1.0` while holding different code. Reinstalling therefore downloaded the same
+snapshot forever, and there was no way to tell. Pin a specific ref when you want one:
+
+```sh
+curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
 ### 3 · From a clone (for development)
@@ -124,7 +141,33 @@ authenticated session cookie.
 | `--link` | symlink the checkout instead of copying — for hacking on the plugin |
 | `--print` | resolve everything, write nothing |
 | `--uninstall` | remove the package and its bundle entry, keeping the profile and its sessions |
+| `--doctor` | inspect an existing install and print every problem with a fix for each — read-only |
+| `--repair` | re-copy the payload over an existing install, keeping the profile and its sessions |
 | `--json` | machine-readable result |
+
+### If something looks wrong
+
+Do **not** delete the profile and start over — that is both destructive and, when the real cause
+was an unstartable Node, guaranteed not to help. Ask instead:
+
+```sh
+node install.mjs --profile frutiger --doctor
+```
+
+It reports what is actually wrong, why, and the one command that fixes it, and it exits non-zero
+only when there is something to act on. Every install prints the **build fingerprint** it wrote, so
+"am I on the latest?" has an answer that does not depend on trusting the version string:
+
+```text
+dsh-frutiger-aero: installed profile "frutiger" (copy)
+  version   1.1.0
+  build     20bfbdb4cf57
+```
+
+The fingerprint is a content hash of the sources the artifact was built from, and the build is
+reproducible, so it identifies a build exactly — two builds that differ in one byte of CSS have
+different fingerprints. That is what makes `--doctor` able to tell you your copy is stale rather
+than guessing from a version number that two different snapshots happen to share.
 
 ---
 
@@ -414,7 +457,8 @@ needed to install anything, but it is how every claim in this README was checked
 | --- | --- |
 | `interact.mjs` | **real input** — CDP touch swipes, taps, typing, wheel, drag, selection: 29 assertions per run, in both shipped locales |
 | `docktest.mjs` | the phone dock in Chinese and English: 24 assertions per run |
-| `trajcheck.mjs` | the Trajectory view on a phone and on the desktop: 11 assertions |
+| `trajcheck.mjs` | the Trajectory view on a phone and on the desktop: 33 assertions |
+| `installcheck.mjs` | the install path without a browser — Node floor, idempotency, `--doctor`, `--repair`, reproducibility: 15 checks |
 | `settingscheck.mjs` | the settings dialog from the dock, both locales, phone and desktop: 23 assertions |
 | `aligndiff.mjs` | off-centre controls **introduced by the skin**, measured against a stock profile |
 | `final.mjs` | every viewport: layout, drawer, dock, computed styles, console errors, screenshots |

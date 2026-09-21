@@ -83,12 +83,26 @@ curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main
 irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex
 ```
 
-两者都会下载最新发布版，放进目标 profile 的 `node_modules`，并把它加入该 profile 的 bundle 列表。
-除了 Node 什么都不需要 —— 不用包管理器、不连 registry、不用构建。
+两者都会下载本仓库的一份快照，放进目标 profile 的 `node_modules`，并把它加入该 profile 的 bundle 列表。
+除了 **Node 24 或更新版本** 什么都不需要 —— 不用包管理器、不连 registry、不用构建。
 想装到 `frutiger` 以外的 profile：
 
 ```sh
 curl -fsSL .../install.sh | sh -s -- --profile aero
+```
+
+> **为什么要求 Node 24，而不是以前写的 20。** Harness CLI 的入口是
+> `if (import.meta.main)`，这个属性在 Node 24 之前根本没有实现。在 20 和 22 上这个判断恒为假：
+> `dsh` **什么都不打印**，然后以 0 退出。这和"安装坏了"完全无法区分，也是绝大多数人认为这个插件装不上的真正原因。
+> 现在安装脚本会直接拒绝在旧 Node 上运行，并一句话说清原因，而不是留给你一个静默无反应的命令。
+
+安装脚本默认拉取**默认分支**，而不是 `releases/latest`。早期版本正好相反，由此产生了第二个更隐蔽的问题：
+发布标签是在某一刻从分支上切下来的，而 `package.json` 一直在报告**分支**的版本号，
+于是标签 `1.0.3` 和 `main` 都自称 `version: 1.1.0`，内容却不同。
+结果就是重新安装永远只会拿到同一份快照，而且无从分辨。想固定到某个 ref 时：
+
+```sh
+curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
 ### 3 · 从克隆仓库安装（开发用）
@@ -117,7 +131,31 @@ dsh --profile frutiger --port 3099 --no-open
 | `--link` | 用软链接代替复制 —— 方便改插件本身 |
 | `--print` | 只解析、不写任何文件 |
 | `--uninstall` | 删除包与 bundle 条目，保留 profile 及其会话 |
+| `--doctor` | 体检现有安装，逐条列出问题与对应修法 —— 只读，不写任何文件 |
+| `--repair` | 在原地重新拷贝一份，保留 profile 及其会话 |
 | `--json` | 输出机器可读结果 |
+
+### 出问题了怎么办
+
+**不要**删掉 profile 重装 —— 那既有破坏性，而且在真正的原因是 Node 根本跑不起 CLI 时，删了重装必然没用。
+应该这样问：
+
+```sh
+node install.mjs --profile frutiger --doctor
+```
+
+它会告诉你到底哪里不对、为什么不对，以及修好它需要的那一条命令；只有真的有问题时才会以非零状态退出。
+每次安装都会打印它写进去的 **构建指纹**，于是"我装的是最新版吗"有了一个不必依赖版本号的答案：
+
+```text
+dsh-frutiger-aero: installed profile "frutiger" (copy)
+  version   1.1.0
+  build     20bfbdb4cf57
+```
+
+这个指纹是构建所依据源码的内容哈希，而构建是可复现的，所以它能精确标识一次构建 ——
+哪怕只差一个字节的 CSS，指纹也不同。正因如此，`--doctor` 才能判断出你手上那份是旧的，
+而不是靠一个两份不同快照恰好都在用的版本号去猜。
 
 ---
 
@@ -388,7 +426,8 @@ CSS-module 的类名是按构建哈希的（`.pI_x6G_sidebarCol`），拿它当�
 | --- | --- |
 | `interact.mjs` | **真实输入** —— CDP 触摸滑动、点击、键入、滚轮、拖拽、选择：每次运行 29 条断言，两种语言各跑一遍 |
 | `docktest.mjs` | 手机端底栏在中文与英文下：每次 24 条断言 |
-| `trajcheck.mjs` | 轨迹界面在手机端与电脑端：11 条断言 |
+| `trajcheck.mjs` | 轨迹界面在手机端与电脑端：33 条断言（其中电脑端部分是一组反向校验，确认手机端专属处理没有渗入宽布局）|
+| `installcheck.mjs` | 不依赖浏览器的安装路径验证 —— Node 版本下限、可重复安装、`--doctor`、`--repair`、构建可复现：15 条检查 |
 | `settingscheck.mjs` | 从底栏打开设置：两种语言、手机与电脑端，23 条断言 |
 | `aligndiff.mjs` | 与原生 profile 对比，找出**由皮肤引入**的控件错位 |
 | `final.mjs` | 各视口下的布局、抽屉、dock、计算样式、控制台报错与截图 |

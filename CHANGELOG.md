@@ -4,6 +4,109 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The install path no longer strands you, and no longer lies to you.** Two
+  separate defects made "安装失败还得全删掉再重新安装" the only advice anyone
+  could give, and neither was a crash:
+
+  The installers fetched `releases/latest`. A release tag is cut from a branch
+  at a moment in time while `package.json` keeps reporting the *branch's*
+  version, so tag `1.0.3` and `main` both announced `version: 1.1.0` while
+  holding different code — verified against the live repository, the tag's
+  `src/css/mobile.css` contains none of the mobile fixes that exist on `main`.
+  The tag therefore never moved, so reinstalling downloaded the same snapshot
+  every time, so the version string could not distinguish anything. `install.sh`
+  and `install.ps1` now default to the **default branch** (asked of the API, not
+  hardcoded) and take `--ref` / `-Ref` to pin a tag deliberately.
+
+  And on Node 20 and 22 the Harness CLI does not fail — it exits **0 having
+  printed nothing at all**, because `import.meta.main` is unimplemented there
+  and the entry guard is therefore falsy. A user on 22 saw a skin that did
+  nothing and reasonably called the install broken. `engines` had claimed
+  `>=20`, which was actively misleading. Both installers now check the major
+  version up front and refuse with one sentence that names the cause, and both
+  `package.json` files require `>=24`.
+
+- **`--doctor` and `--repair`: diagnose instead of starting over.** `node
+  install.mjs --doctor` is read-only and reports what is wrong, why, and the one
+  command that fixes each finding, ending with an explicit *no step above
+  requires deleting the profile*. `--repair` re-copies the payload in place. The
+  upgrade path was verified end to end against a genuine release-`1.0.3` install:
+  the doctor caught that the copy predates build fingerprints and that it differs
+  from the sources, `--repair` upgraded it, and the subsequent doctor run
+  reported healthy — with sessions and hand-written files in the profile
+  untouched. Five checks, including a broken symlink and a missing
+  `lib/index.js`.
+
+- **Builds now have an identity, so "am I on the latest?" is answerable.**
+  `build.mjs` bakes a fingerprint — a content hash of the sources the artifact
+  was built from — into `lib/client.js`, and every install prints it:
+
+  ```text
+  version   1.1.0
+  build     20bfbdb4cf57
+  ```
+
+  The input list lives in `scripts/source-fingerprint.mjs`, imported by both the
+  build and the installer, because two lists would drift and turn every healthy
+  install into a false "stale" report — and a check that cries wolf is worse
+  than no check. `install.mjs` hashes *sources* rather than the installed
+  artifact's own self-report, so a copy old enough to predate the field still
+  gets a definitive answer instead of a shrug.
+
+- **The build is now byte-reproducible.** It previously embedded a `builtAt`
+  timestamp in the artifact, so rebuilding identical sources produced different
+  bytes and an installed copy would have looked stale after every rebuild. The
+  timestamp is gone; `installcheck.mjs` asserts the property directly, because
+  the staleness check above is only meaningful if it holds.
+
+- **`devtools/installcheck.mjs`** — 15 checks over the install path with no
+  browser: the POSIX parse, help output not silently truncating, the Node floor
+  actually refusing Node 22, a second run deleting nothing, the printed
+  fingerprint matching the sources, `--doctor` clean/exit-0 on a healthy install
+  and fingerprint-identified when stale, `--repair` preserving sessions, and the
+  build's reproducibility.
+
+### Fixed — mobile
+
+- **The Trajectory inspector was see-through, which made things genuinely
+  untappable.** The product renders the detail panel as a 74%-alpha overlay at
+  narrow widths, so the event table showed straight through it: two interfaces
+  legible at once, and a tap landed on whatever happened to be on top. Measured
+  `rgba(255, 255, 255, 0.74)` before; the panel and its header/tabs are now
+  opaque (`rgb(244, 251, 255)`). This, not a layout problem, is what "有很多
+  things 点不到" actually described.
+
+- Touch reach on the Trajectory view: the inspector's close button gets a 44×44
+  hit area, the request-boundary control grows from 16px to 44px while a
+  `-14px` margin keeps its painted 5px dot exactly where it was, and each row
+  gains a 7px hit strip in the gap *below* it — a full-cell overlay was tried
+  first and swallowed the horizontal drag, so the band is deliberately clear of
+  the inner scrollers (measured: 0 of 9 rows overlap).
+
+- Rows gained `cursor: pointer` and `:active` / `[data-selected]` feedback so a
+  tap is visibly acknowledged, and the timeline got a readable 11px label,
+  a 52px label column, thicker bars and a 44px track floor.
+
+### Changed
+
+- A stale claim was removed from `src/css/mobile.css`. An earlier audit recorded
+  that the product's 50px gutter *clips* the turn and kind labels; it does not.
+  The product ships a container query that fires at this width and deliberately
+  hides those labels (`opacity: 0; max-width: 0`) in favour of an icon and a
+  compact label. A hidden element still reports `scrollWidth > clientWidth`,
+  which is what the probe had measured. The file now documents the measurement
+  and the actual mechanism, so the codebase stops carrying a false story.
+
+  The desktop counter-checks in `trajcheck.mjs` grew from 11 assertions to 33 for
+  the same reason: every phone-side improvement is paired with an assertion that
+  the wide layout did not move — row height, gutter sticky-ness, cursor, type
+  scale, label column, plot height, and the absence of the phone-only hit strip
+  and fade mask.
+
 ## [1.1.0] — 2026-09-20
 
 ### Added

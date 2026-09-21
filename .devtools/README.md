@@ -27,7 +27,8 @@ node landing.mjs http://127.0.0.1:8099/index.html # the GitHub Pages page
 | --- | --- |
 | `interact.mjs <url> [locale]` | **real input** — CDP touch swipes, `touchscreen.tap`, typing, wheel, drag, selection: 29 assertions. Run it in `en-US` **and** `zh-CN`; the client ships both, and passing in one is not passing |
 | `docktest.mjs <url>` | the phone dock, both locales: 24 assertions |
-| `trajcheck.mjs <url>` | the Trajectory view on a phone and on the desktop: 11 assertions |
+| `trajcheck.mjs <url>` | the Trajectory view on a phone and on the desktop: 33 assertions. The desktop half is a set of counter-checks — it asserts that none of the phone-only treatment leaked into the wide layout |
+| `installcheck.mjs [--offline]` | **the install path, with no browser**: the Node floor, idempotency, `--doctor`, `--repair`, and build reproducibility: 15 checks. The only suite that verifies what happens before a page is ever opened, which is where "it failed to install" reports come from |
 | `settingscheck.mjs <url>` | the settings dialog opened from the dock — both locales, phone and desktop: 23 assertions |
 | `clipaudit.mjs <url>` | whether any **visible** label is cut off, across the chat, drawer, settings dialog and right panel |
 | `run-suite.sh <url>` | everything above that can run unattended, as one command with one verdict |

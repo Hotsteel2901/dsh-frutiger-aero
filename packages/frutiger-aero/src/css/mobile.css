@@ -578,35 +578,66 @@ body[data-fa-keyboard] [data-fa-col="center"] {
 }
 
 /* ══ The Trajectory view ════════════════════════════════════════════════════
-   The trajectory panel is a real two-column table — a 50px timeline gutter and
-   a content cell — and on a phone the content cell is exactly the width that is
+   The trajectory panel is a real two-column table — a timeline gutter and a
+   content cell — and on a phone the content cell is exactly the width that is
    left over, with `white-space: nowrap; overflow: hidden; text-overflow: clip`.
    A row therefore shows the first forty characters of a line that can be three
    thousand pixels long, and cuts off mid-glyph with no sign that anything is
    missing. That is the "uncomfortable on mobile" part.
 
+   ## A correction, because the first audit of this file got it wrong
+
+   An earlier pass reported that the gutter was clipping its labels — "第 1 轮"
+   over by 29px, `ASSISTANT` by 59px — and this block was written on that
+   premise. It was a measurement artefact and the premise was false. The
+   product ships a container query for exactly this width:
+
+       @container Y0dWHa_trajectory-table (width <= 620px) {
+         .Y0dWHa_eventColumn { width: 50px }
+         .Y0dWHa_kindSlot     { width: 19px }
+         .Y0dWHa_kindTagLabel, .Y0dWHa_turnLabelFull { opacity: 0; max-width: 0 }
+         .Y0dWHa_turnLabelCompact { opacity: 1 }
+       }
+
+   — a deliberate swap of the text labels for the icon and the compact turn
+   number. Those labels are *hidden*, and a hidden element still reports a
+   `scrollWidth` wider than its zero-width box, so a probe that measures
+   `scrollWidth > clientWidth` finds a "clip" that no one can see. Verified
+   live at 390px: `containerType: inline-size`, column `50px`, `kindSlot 19px`,
+   `kindTagLabel opacity 0 / max-width 0`, `turnLabelCompact opacity 1`. The
+   container query works and the gutter is the product's own.
+
+   The failures worth fixing are elsewhere: a see-through inspector overlay,
+   hit areas that a thumb cannot land on, and no affordance saying a row is
+   tappable at all. Those are at the end of this file, next to the panel fix
+   they belong with.
+
    ## What is deliberately not changed
 
-   **Row height.** The list is virtualised, and the product positions it from a
-   fixed constant:
+   **Row height.** The list is virtualised, and the product derives each row's
+   height from the row's own data:
 
-       const CONTENT_ROW_HEIGHT = 30;
+       const estimateVirtualRowSize = (index) =>
+         virtualRowStructure[index]?.height ?? 30          // 20 collapsed, 9 boundary
 
-   passed as `estimateSize` to the virtualiser, with **no `measureElement`** —
-   there is no measurement pass to correct a wrong estimate. Below 100 rows the
-   virtualiser is off entirely (`VIRTUALIZATION_THRESHOLD`) and taller rows would
-   look fine, which is exactly what makes this dangerous: it would work in
-   testing and break on a long session, where rows would overlap and the spacer
-   heights would drift. A skin does not get to desynchronise a list's layout
-   model, so the 30px row stays and the reading problem is solved sideways.
+   The virtualiser *does* carry a `measureElement` — it is
+   `@tanstack/react-virtual` v3.14.9 and measuring is its default — but this
+   table never attaches it to an element, so the estimate is final and there is
+   no measurement pass to correct a wrong one. Below 100 rows the virtualiser
+   is off entirely (`VIRTUALIZATION_THRESHOLD`) and taller rows would look
+   fine, which is exactly what makes this dangerous: it would work in testing
+   and break on a long session, where rows would overlap and the spacer heights
+   would drift. A skin does not get to desynchronise a list's layout model, so
+   the 30px row stays and the target problem is solved with hit area instead.
 
    ## What is changed
 
    The row keeps its height and its width, and its *content* becomes readable:
    the cell scrolls horizontally under a finger, so a long line can be dragged
-   into view instead of being lost. Truncation is made visible with an ellipsis,
-   and the row gets a press affordance. All of it is scoped to coarse pointers
-   at narrow widths, so the desktop table is byte-for-byte what it was. */
+   into view instead of being lost. Truncation is made visible with an ellipsis
+   and a trailing fade, and the row gets a press affordance. All of it is scoped
+   to coarse pointers at narrow widths, so the desktop table is byte-for-byte
+   what it was. */
 
 @media (pointer: coarse) and (max-width: 1023px) {
   /* A hard cut at the cell edge reads as a rendering fault; an ellipsis reads as
@@ -1106,6 +1137,245 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
     background: var(--fa-panel-solid);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  /* ══ The Trajectory event inspector on a phone ═════════════════════════════
+     Tapping a row opens the product's own record inspector, and on a narrow
+     pane the product does the right thing: it lifts the panel out of the flex
+     row and pins it over the table.
+
+         .Y0dWHa_details { position: absolute; top: 0; bottom: 0; right: 0;
+                           width: min(92%, 420px); z-index: 5 }
+
+     That is an overlay by design, and the table underneath is *meant* to be
+     hidden by it. It was not, because of this skin. The product paints the
+     panel with `var(--dsw-alias-bg-layer-1)`, and this skin redefines that
+     alias to 74% alpha — so the overlay came out see-through and the two
+     layers rendered on top of each other, the table's rows legible straight
+     through the inspector's own text.
+
+     That single missing alpha is the whole of "有很多东西点不到". With two
+     interfaces stacked and both readable, a thumb aims at the thing it can
+     see and lands on whatever is actually on top; the 30px strip of table left
+     uncovered on the left edge is a second, smaller trap. Measured at 390px:
+     the panel lands at 30,156 358x617 over a tablePane that is still 388x617
+     at 0,156 — so before the fix exactly 30px of table was visible and the
+     rest was a double exposure.
+
+     A literal is required rather than a token, for the same reason as
+     `.P3OORG_panel` above: every surface this skin defines is deliberately
+     translucent, so there is nothing opaque to fall back to. */
+  /* The product's own overlay rule lives in `@media (width <= 760px)` and is
+     injected *after* this sheet, so an equal-specificity rule here would lose
+     on source order alone. `html` in front settles it without an `!important`,
+     which keeps the whole block overridable by anyone who comes later. */
+  html .Y0dWHa_details {
+    background: var(--fa-panel-solid);
+    /* The panel is the only thing that should scroll here; the table behind it
+       must not creep under a drag. */
+    overscroll-behavior: contain;
+  }
+
+  /* The same double-exposure exists at the other end of the panel: its header
+     and its tab strip sit on `bg-layer-2` / `bg-layer-1`, both translucent. */
+  html .Y0dWHa_detailsHeader,
+  html .Y0dWHa_detailTabs,
+  html .Y0dWHa_detailsTabs {
+    background: var(--fa-panel-solid);
+  }
+
+  /* A back affordance. The product's close control is a real button, but at
+     20x20 it is the smallest thing on the panel and it sits in the far corner
+     from a right thumb. The visual size is left alone — it is the product's
+     chrome — and only the hit area is grown, via a pseudo-element, so nothing
+     moves and the desktop layout is untouched. */
+  .Y0dWHa_details button[class*="close"],
+  .Y0dWHa_detailsHeader button {
+    position: relative;
+  }
+
+  .Y0dWHa_details button[class*="close"]::after,
+  .Y0dWHa_detailsHeader button::after {
+    content: "";
+    position: absolute;
+    inset: 50% 50% 50% 50%;
+    width: 44px;
+    height: 44px;
+    transform: translate(-50%, -50%);
+  }
+
+  /* ══ Row hit areas ════════════════════════════════════════════════════════
+     The rows are 30px, and the virtualiser's own model says why that cannot
+     simply be raised: `estimateVirtualRowSize` reads the height straight out
+     of the row's data (`virtualRowStructure[index]?.height ?? 30`), so a row
+     is 30, a collapsed-summary row is 20 and a terminal boundary is 9. The
+     library *does* carry a `measureElement`, but this table never hands it an
+     element, so the estimate is the final word and a skin that changed the
+     real height would desynchronise the list on a long session — the failure
+     would only appear past `VIRTUALIZATION_THRESHOLD` rows, which is the
+     worst possible place to find it.
+
+     So the row keeps its height and gains reach instead. A pseudo-element on
+     each content cell is stretched 7px above and below its own box, which
+     takes the effective target from 30px to 44px without moving a single
+     pixel of layout. Neighbouring rows' strips overlap by design — the row
+     whose strip is hit is decided by paint order among equal `z-index`es, and
+     a 14px borrowed band is far cheaper than a row that cannot be tapped. */
+  /* The product only makes a cell a containing block on the rows that start a
+     turn (`.Y0dWHa_table tbody tr[data-turn-start=true] td`), so every other
+     row needs it declared or the strip below would resolve against the table
+     and stretch across the whole pane. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child {
+    position: relative;
+  }
+
+  /* A full-height overlay across the cell was the first attempt and it broke
+     the horizontal drag: the strip sat above the inner scrollers, swallowed the
+     touch, and `scrollLeft` stayed at 0 for finger and test alike — a hit-area
+     fix that removed a gesture is a worse bug than the one it fixed.
+     
+     So the strip only fills the band *between* rows, where a near miss
+     actually lands, and it is 7px tall rather than 44. Two of them meet in each
+     gap so the seam is covered from both sides. Everything at the row's own
+     height is left alone, which is what keeps the drag working. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -7px;
+    height: 7px;
+  }
+
+  /* The request boundary dots are 16x16 — the product's smallest control and
+     the one the timeline is navigated with.
+     
+     Both pseudo-elements are already spoken for here: `::before` is the 5px
+     dot and `::after` is the `data-label` tooltip, so neither can carry a
+     hit area the way the inspector's close button does. The button is instead
+     grown to 44x44 and the dot is re-centred inside it. That has to be done by
+     hand because the button is `position: absolute` and its `left` is a
+     calculated channel (`calc(var(--request-boundary-base-left) + offset)`):
+     widening the box by 28px would push the *visual* dot 28px to the right, so
+     `left` is pulled back by 14px and the already-centred `::before` keeps
+     printing in the same place. Net effect: the painted dot does not move a
+     pixel and a thumb has a 44px square to land in. */
+  /* Same cascade problem as the inspector above: the product's own
+     `@media (width <= 760px)` body sets `width: 16px; height: 16px` and is
+     injected after this sheet, so `html` leads to outrank it. Without that the
+     measured box stays 16x16 and the growth silently does nothing. */
+  html .Y0dWHa_requestBoundaryControl {
+    width: 44px;
+    height: 44px;
+    margin: -14px 0 0 -14px;
+  }
+
+  /* ══ Affordance ═══════════════════════════════════════════════════════════
+     A row carries `tabindex="0"` and an `onClick`, but paints `cursor: default`
+     and no hover state, so on a touch device it is a target with no sign that
+     it is one. The rail on the leading edge appears on press, which is late
+     but honest — it confirms the tap landed and it costs nothing until then. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key] {
+    cursor: pointer;
+  }
+
+  [data-trajectory-scroll] tr[data-trajectory-row-key]:active > td:last-child {
+    background-color: color-mix(
+      in srgb,
+      var(--dsw-alias-interactive-bg-hover) 70%,
+      transparent
+    );
+  }
+
+  /* Selected rows have to be identifiable at a glance once the inspector is
+     covering most of the table, or closing it cannot be told from not having
+     opened it. The product already exposes `data-selected`. */
+  [data-trajectory-scroll] tr[data-trajectory-row-key][data-selected] > td:last-child {
+    background-color: color-mix(
+      in srgb,
+      var(--dsw-alias-brand-primary-new-colorprimary-new-color, var(--fa-accent)) 14%,
+      transparent
+    );
+  }
+
+  /* ══ The reading problem ══════════════════════════════════════════════════
+     30px rows at 12px type is the product's density, and it is defensible on a
+     desktop where the table has the width to match. On a phone the content
+     cell is 338px and a tool call can be thousands of pixels wide, so the cell
+     scrolls sideways. The ellipsis from the older rule above is what says more
+     exists.
+
+     A trailing-edge fade was tried here and taken back out. The mask has to go
+     on the cell, because that is the scroll container — and a mask resolves
+     against the container's own box, so it stayed welded to the right edge
+     instead of travelling with the content, and it turned the horizontal drag
+     flaky. The ellipsis costs nothing and is honest; a fade that lies about
+     where the text ends is worse than no fade. */
+  /* Type floors. 8px is not a size anything should have to read on a phone —
+     the turn label is the one place the product drops to it, and it is the
+     label the whole left gutter is read against. */
+  .Y0dWHa_turnLabelCompact,
+  .Y0dWHa_kindTag {
+    font-size: 10px;
+  }
+
+  .Y0dWHa_turnRail {
+    /* The turn rail is 2px and marks where a request begins; at phone viewing
+       distance it reads as a smudge. */
+    width: 3px;
+  }
+
+  /* ══ The request timeline ═════════════════════════════════════════════════
+     The `输入 / 模型 / 工具` strip above the table plots the session as a Gantt
+     chart: one span per record, positioned by `--trajectory-span-left` and
+     `--trajectory-span-width` as percentages of the whole. The geometry is
+     proportional and correct — measured spans land at 11.1% intervals with 1px
+     gaps, and the widest end at x=387 against a 388px track, so nothing
+     overflows. What does not survive the shrink is the *reading*:
+
+     - `._1p9O6q_plot` is a `44px minmax(0,1fr)` grid and `._1p9O6q_labels` is
+       `font-size: 10px; line-height: 1`. Three two-character labels stacked in
+       44px at 10px is legible on a desktop at arm's length and is not on a
+       phone, and the label column is a fixed 44px so it cannot grow with the
+       type without stealing from the track.
+     - The bars are 8px tall on a 14px lane pitch. At 388px the spans come out
+       around 36px wide, so an eight-pixel bar carrying a third of the visual
+       weight of the row is closer to a dotted line than a chart.
+
+     So: give the label column a little more room (it is a third of the track's
+     font-size problem, not the data's), raise the label type to a floor that
+     can actually be read, and thicken the bars so the three lanes read as
+     three lanes. None of it touches the geometry the percentages depend on —
+     `--trajectory-span-*` are untouched, so the chart stays proportional and
+     the desktop strip is unchanged. */
+  /* `html` leads on every one of these for the same reason as the inspector and
+     the boundary dot: the product's stylesheet is injected after this one, so
+     at equal specificity it wins and the declaration is silently discarded
+     while still reading as if it applied. The first pass of this block omitted
+     it and measured 10px / `44px 344px` — i.e. nothing had changed. */
+  html ._1p9O6q_labels {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  html ._1p9O6q_plot {
+    /* The label column, not the row, because the track must keep `1fr` or the
+       percentage maths behind every span silently changes meaning. */
+    grid-template-columns: 52px minmax(0, 1fr);
+    height: 54px;
+  }
+
+  html ._1p9O6q_span {
+    border-radius: 3px;
+    opacity: 0.92;
+  }
+
+  /* The strip is a drag surface — `touch-action: none` and a crosshair cursor
+     are the product saying so — but nothing on screen says it is one that can
+     be *tapped* as well. The track gets the same minimum reach as the rest of
+     the phone layout. */
+  html ._1p9O6q_track {
+    min-height: 44px;
   }
 }
 

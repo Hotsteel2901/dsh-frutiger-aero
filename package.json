@@ -22,7 +22,7 @@
     "url": "https://github.com/Hotsteel2901/dsh-frutiger-aero/issues"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "scripts": {
     "build": "node packages/frutiger-aero/build.mjs",

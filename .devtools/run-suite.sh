@@ -96,6 +96,13 @@ run "wallpaper density control" node "$HERE/bubbles.mjs" "$URL"
 echo "── resources ─────────────────────────────────────────────────────"
 run "no unexpected 4xx/5xx" node "$HERE/netcheck.mjs" "$URL"
 
+# Last, and deliberately so: this is the only suite that needs no browser and no
+# running profile, so it still reports when everything above could not start.
+# It covers the install path — the Node floor, idempotency, --doctor, --repair
+# and build reproducibility — which is where "it failed to install" comes from.
+echo "── the install path ──────────────────────────────────────────────"
+run "install, doctor and repair" node "$HERE/installcheck.mjs"
+
 echo
 echo "══════════════════════════════════════════════════════════════════"
 if [ $FAIL -eq 0 ]; then

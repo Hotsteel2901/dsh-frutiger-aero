@@ -52,8 +52,19 @@ export async function closeDrawer(page) {
   return true
 }
 
-/** Open a session by its visible title, and prove the transcript rendered. */
-export async function openSession(page, title, { mobile = false } = {}) {
+/**
+ * Open a session by its visible title, and prove the transcript rendered.
+ *
+ * @param options.mobile - open the drawer first (narrow layouts).
+ * @param options.tap - use a real touchscreen tap when the context has one.
+ *   Defaults to `mobile`: a phone context is created with `hasTouch`, a desktop
+ *   one is not. Calling `touchscreen.tap` on a context without touch throws, so
+ *   this is chosen from the context rather than assumed — and it must not be
+ *   forced to `true` to "make it more realistic", because adding `hasTouch` to
+ *   a desktop context flips `(pointer: coarse)` and silently enables the phone
+ *   stylesheet.
+ */
+export async function openSession(page, title, { mobile = false, tap = mobile } = {}) {
   if (mobile) await openDrawer(page)
 
   /**
@@ -85,7 +96,8 @@ export async function openSession(page, title, { mobile = false } = {}) {
     })()`)
     if (handle !== null) {
       const { x, y } = JSON.parse(handle)
-      await page.touchscreen.tap(x, y)
+      if (tap) await page.touchscreen.tap(x, y)
+      else await page.mouse.click(x, y)
     }
   } else {
     await page.locator('body').getByText(title, { exact: false }).first()
