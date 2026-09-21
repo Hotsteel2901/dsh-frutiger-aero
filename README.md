@@ -7,8 +7,7 @@ kind: "plugin"
 
 English | [中文](README.zh.md)
 
-[![npm version](https://img.shields.io/npm/v/dsh-frutiger-aero?color=4cc4ef)](https://www.npmjs.com/package/dsh-frutiger-aero)
-[![npm downloads](https://img.shields.io/npm/dm/dsh-frutiger-aero?color=4cc4ef)](https://www.npmjs.com/package/dsh-frutiger-aero)
+[![CI](https://github.com/Hotsteel2901/dsh-frutiger-aero/actions/workflows/ci.yml/badge.svg)](https://github.com/Hotsteel2901/dsh-frutiger-aero/actions/workflows/ci.yml)
 [![license](https://img.shields.io/badge/license-MIT-4cc4ef.svg)](LICENSE)
 [![dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4cc4ef.svg)](https://github.com/topics/dsh-plugin)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-0d7cb4.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -63,19 +62,9 @@ becomes an app.
 
 ## Install
 
-Three ways in. Pick whichever matches what you already have.
+One line. No package manager, no registry account, no build step.
 
-### 1 · npm one-liner (recommended)
-
-```sh
-dsh plugin --profile web add dsh-frutiger-aero
-```
-
-Installs the latest published version and registers it as a profile bundle layer. Reload the web
-UI and it is on. Works on every platform, and
-`dsh plugin --profile web remove dsh-frutiger-aero` takes it back off.
-
-### 2 · GitHub installer (no npm account, no git)
+### GitHub installer
 
 **macOS / Linux:**
 
@@ -114,7 +103,7 @@ snapshot forever, and there was no way to tell. Pin a specific ref when you want
 curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
-### 3 · From a clone (for development)
+### From a clone (for development)
 
 ```sh
 git clone https://github.com/Hotsteel2901/dsh-frutiger-aero
@@ -221,8 +210,8 @@ than the one `dsh` prints. A query parameter always beats the stored preference,
 
 The profile reloads its patch file live, so this takes effect without a restart.
 
-**Remove it.** `node install.mjs --uninstall`, or
-`dsh plugin --profile web remove dsh-frutiger-aero`. The profile and its sessions are left alone.
+**Remove it.** `node install.mjs --uninstall`, or run `install.sh --uninstall` on a copy of the
+one-liner. The profile and its sessions are left alone.
 
 ---
 
@@ -478,8 +467,8 @@ in both colour schemes, at every tier, and in both languages the client ships. C
 
 ```
 install.mjs                  portable profile installer / uninstaller
-install.sh, install.ps1      GitHub one-liners (no npm account needed)
-packages/frutiger-aero/      the plugin — this is what gets published to npm
+install.sh, install.ps1      GitHub one-liners
+packages/frutiger-aero/      the plugin itself
   package.json               dsh.bundle + dsh.client declarations
   cordis.patch.yml           the one row this bundle inserts
   build.mjs                  inlines src/css/*.css into lib/client.js

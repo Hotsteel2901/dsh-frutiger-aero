@@ -7,8 +7,7 @@ kind: "plugin"
 
 [English](README.md) | 中文
 
-[![npm 版本](https://img.shields.io/npm/v/dsh-frutiger-aero?color=4cc4ef)](https://www.npmjs.com/package/dsh-frutiger-aero)
-[![npm 下载量](https://img.shields.io/npm/dm/dsh-frutiger-aero?color=4cc4ef)](https://www.npmjs.com/package/dsh-frutiger-aero)
+[![CI](https://github.com/Hotsteel2901/dsh-frutiger-aero/actions/workflows/ci.yml/badge.svg)](https://github.com/Hotsteel2901/dsh-frutiger-aero/actions/workflows/ci.yml)
 [![许可](https://img.shields.io/badge/license-MIT-4cc4ef.svg)](LICENSE)
 [![dsh-plugin](https://img.shields.io/badge/topic-dsh--plugin-4cc4ef.svg)](https://github.com/topics/dsh-plugin)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-0d7cb4.svg)](https://github.com/deepseek-ai/deepseek-harness)
@@ -58,18 +57,9 @@ kind: "plugin"
 
 ## 安装
 
-三种方式，挑你已经有的那套工具就行。
+一行命令。不用包管理器、不用 registry 账号、不用构建。
 
-### 1 · npm 一行命令（推荐）
-
-```sh
-dsh plugin --profile web add dsh-frutiger-aero
-```
-
-装上最新发布版并注册为 profile bundle 层。刷新网页界面即可生效，全平台通用。
-卸载：`dsh plugin --profile web remove dsh-frutiger-aero`。
-
-### 2 · GitHub 安装脚本（不需要 npm 账号，也不需要 git）
+### GitHub 安装脚本
 
 **macOS / Linux：**
 
@@ -105,7 +95,7 @@ curl -fsSL .../install.sh | sh -s -- --profile aero
 curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
-### 3 · 从克隆仓库安装（开发用）
+### 从克隆仓库安装（开发用）
 
 ```sh
 git clone https://github.com/Hotsteel2901/dsh-frutiger-aero
@@ -208,8 +198,8 @@ http://127.0.0.1:3099/?bubbles=calm       # 安静一点的壁纸，不动已保
 
 profile 的 patch 文件是实时重载的，不需要重启。
 
-**彻底移除。** `node install.mjs --uninstall`，或
-`dsh plugin --profile web remove dsh-frutiger-aero`。profile 和会话都会保留。
+**彻底移除。** `node install.mjs --uninstall`，或者在安装脚本副本上跑 `install.sh --uninstall`。
+profile 和会话都会保留。
 
 ---
 
@@ -445,8 +435,8 @@ CSS-module 的类名是按构建哈希的（`.pI_x6G_sidebarCol`），拿它当�
 
 ```
 install.mjs                  可移植的 profile 安装/卸载器
-install.sh, install.ps1      GitHub 一行安装脚本（无需 npm 账号）
-packages/frutiger-aero/      插件本体 —— 发布到 npm 的就是它
+install.sh, install.ps1      GitHub 一行安装脚本
+packages/frutiger-aero/      插件本体
   package.json               dsh.bundle + dsh.client 声明
   cordis.patch.yml           这个 bundle 插入的唯一一行
   build.mjs                  把 src/css/*.css 内联进 lib/client.js

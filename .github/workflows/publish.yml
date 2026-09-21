@@ -1,5 +1,30 @@
 # Publish `packages/frutiger-aero` to npm on a version tag.
 #
+# ══ CURRENTLY INACTIVE — NOT IN USE ══════════════════════════════════════════
+#
+# This project is not published to npm, and the maintainer has no npm account.
+# Nothing user-facing references the registry any more: installation is the
+# GitHub installer (`install.sh` / `install.ps1`), which resolves the default
+# branch and needs no package manager. This workflow is kept because it is
+# correct and ready, not because it runs.
+#
+# It is safe to leave enabled. It skips itself whenever `NPM_TOKEN` is unset —
+# which it is — and reports a notice rather than a failure, so a version tag
+# does not produce a red X for a condition everyone already knows about. It has
+# never published from a branch push and never will.
+#
+# To switch it on, if that ever becomes desirable:
+#
+#   1. Create the package on npmjs.com under the name in
+#      `packages/frutiger-aero/package.json`, or rename both together —
+#      the registry maps a listing to its package by name and will not
+#      accept a mismatch.
+#   2. Add an `NPM_TOKEN` automation token (publish rights) as a repository
+#      secret via Settings → Secrets and variables → Actions.
+#   3. Re-run this workflow, or push a tag.
+#
+# `RELEASE.md` §6 carries the same note on the manual path.
+#
 # Requires an `NPM_TOKEN` repository secret (an npm automation token with publish
 # rights). Without it the workflow fails at the npm step and nothing is
 # published — it never publishes anything on a branch push.

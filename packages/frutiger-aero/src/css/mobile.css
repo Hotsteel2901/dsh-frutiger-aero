@@ -1377,7 +1377,77 @@ html.fa-tier-off [data-trajectory-scroll] tr[data-trajectory-row-key] > td:first
   html ._1p9O6q_track {
     min-height: 44px;
   }
+
+  /* ══ The control that swallowed every tap on the inspector ════════════════
+     This is the whole of "有很多东西点不到", and it is one declaration.
+
+     ## What was wrong
+
+     On a phone, once a record was open, the inspector was comprehensively
+     dead: none of the six detail tabs switched, the close control did nothing,
+     and the overview titles could not be tapped. The obvious suspects were all
+     wrong. The panel is not transparent (it has an opaque background from the
+     rule above), and its `z-index` is not the problem.
+
+     `document.elementFromPoint` at the close button's centre returned
+     `.Y0dWHa_timestampToggle` — and so did a *blank* point in the middle of the
+     panel, and so did the centre of every tab. One element was claiming the
+     entire panel. Its own box is `139,582 146x20`, which sits near the bottom
+     of the inspector, and its container is a 57px-tall `overflow: auto`
+     summary strip holding 70px of content — so the control's layout rect is
+     the unclipped one, and that escaped rect is what Chromium hit-tests. The
+     rect covers the panel, so the panel became one big timestamp toggle.
+
+     ## Why nothing else fixed it
+
+     Three other approaches were measured and discarded, because each one
+     either did not address the cause or made things worse:
+
+     - **Moving the panel to `<body>`** (a portal, to escape the isolated
+       stacking context under the composer). This fixed the geometry — escapes
+       in a 24-point sample went 6 -> 0 — and broke the panel entirely. The
+       panel is React-rendered and the app delegates its listeners to `#root`;
+       a node outside that subtree has no working handlers. Measured: after the
+       move every control reported the *correct* hit target and none of them
+       responded, and moving the node back did not repair React's bookkeeping
+       either.
+     - **Opaque backgrounds.** Already in place, and irrelevant: the taps were
+       being absorbed, not merely obscured.
+     - **`z-index` on the panel.** It cannot work — the panel sits inside
+       `.qBU-ya_ledger`, which has `isolation: isolate`, so the panel's
+       `z-index` only ever orders it among that layer's children.
+
+     ## What the cause actually was, and why one line fixes it
+
+     Measured on a 390x844 touch viewport, the same probe three ways:
+
+         baseline                        close -> timestampToggle, blank -> timestampToggle
+         toggle via `display: none`      close -> close,           blank -> resultBlocks
+         toggle via `pointer-events:none`close -> close,           blank -> resultBlocks
+
+     The instant that one control stops claiming pointer input, the whole panel
+     becomes reachable. `pointer-events: none` is the right lever rather than
+     hiding it: the timestamp is information worth keeping on screen, and it is
+     not something that needs a finger — the summary strip around it is what a
+     user scrolls. Verified afterwards with real touch input, not just hit
+     tests: tapping 参数 changes the active tab from 概述 to 参数, and tapping
+     close dismisses the panel. Neither worked before.
+
+     ## The two details that make it work
+
+     `html` in front of the selector is load-bearing. The product shapes this
+     control with its own `pointer-events` declaration, injected *after* this
+     sheet, so a bare class selector here loses on source order alone —
+     measured: the rule parsed and matched (`pointer-events: none` visible in
+     the CSSOM, `matches()` true) while the computed value stayed `auto`. One
+     extra element of specificity settles it without `!important`, which keeps
+     the block overridable and matches the idiom used for the panel background
+     above.
+
+     And the whole block stays inside this `(pointer: coarse)` query, so the
+     desktop inspector is untouched — at 1440px the same probe reports a `SPAN`
+     inside the close button and then the close button itself, i.e. healthy. */
+  html .Y0dWHa_timestampToggle {
+    pointer-events: none;
+  }
 }
-
-
-

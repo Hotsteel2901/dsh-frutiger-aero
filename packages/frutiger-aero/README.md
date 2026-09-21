@@ -2,10 +2,11 @@
 
 A dsh profile bundle that reskins the browser surface in Frutiger Aero and
 rebuilds the narrow-viewport layout around touch. Install it with the installer
-in the repository root (`node ../../install.mjs`) or as a normal bundle:
+in the repository root:
 
 ```sh
-dsh plugin --profile frutiger add /absolute/path/to/this/package
+node ../../install.mjs              # into `--profile frutiger`
+node ../../install.mjs --link       # …or link the checkout, so a rebuild is live
 ```
 
 ## Shape

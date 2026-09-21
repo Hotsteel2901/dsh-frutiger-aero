@@ -4,9 +4,10 @@
 #   $env:DSH_FRUTIGER_PROFILE = 'aero'; irm ... | iex
 #   irm ... | iex -Args '-Ref','main'          # pin a specific ref
 #
-# Needs nothing but Node and PowerShell 5.1+. No npm account, no git, no build.
-# It downloads a snapshot of this repository and hands over to the bundled
-# `install.mjs`, so the install logic lives in exactly one place.
+# Needs nothing but Node and PowerShell 5.1+. No package manager, no registry
+# account, no git, no build. It downloads a snapshot of this repository and
+# hands over to the bundled `install.mjs`, so the install logic lives in exactly
+# one place.
 #
 # It installs the default branch rather than `releases/latest`, for the reason
 # spelled out in install.sh: a release tag and the branch it was cut from both

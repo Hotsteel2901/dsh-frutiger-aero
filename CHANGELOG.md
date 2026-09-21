@@ -4,6 +4,82 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] — 2026-09-21
+
+### Fixed
+
+- **The Trajectory inspector no longer passes taps through to the table behind
+  it.** The previous release made the panel *opaque* and reported the taps fixed;
+  they were not. Opacity was necessary and nowhere near sufficient, and the
+  remaining defect had a different cause entirely — which is why a second round
+  of work was needed.
+
+  `document.elementFromPoint` at the close button returned the same element as a
+  call at a *blank* spot in the middle of the panel, and at the centre of every
+  detail tab: one control was claiming the whole panel. It was
+  `.Y0dWHa_timestampToggle`, which lives inside a 57px-tall `overflow: auto`
+  summary strip holding 70px of content. Chromium hit-tests a scroll container's
+  descendants using their **unclipped** rects, so that control's escaped rect
+  covered the panel and absorbed every tap aimed anywhere inside it. The fix is
+  one rule, scoped to touch layouts:
+
+  ```css
+  html .Y0dWHa_timestampToggle { pointer-events: none; }
+  ```
+
+  `html` is load-bearing rather than decorative: the product injects its own
+  `pointer-events` declaration for this class *after* the skin sheet, so a bare
+  class selector loses on source order — measured, the rule parsed and matched
+  while the computed value stayed `auto`. `pointer-events: none` rather than
+  `display: none`, because the timestamp is worth keeping on screen and is not
+  something a finger needs; the strip around it is what a user scrolls.
+
+- **Two approaches were measured and abandoned, and that is recorded so they are
+  not retried.** Re-parenting the panel onto `document.body` (a portal, to escape
+  the isolated stacking context under the composer) fixed the geometry — escape
+  count went 6 → 0 in a 24-point sample — and broke the panel completely: the
+  panel is React-rendered and the app delegates listeners to `#root`, so a node
+  outside that subtree receives clicks and does nothing, and moving it back did
+  not repair React's bookkeeping. Adjusting `z-index` or neutralising the
+  `isolation: isolate` ledger changed nothing, because the overlap was not
+  between siblings. The plugin's "it may only paint" contract now cites the
+  portal failure as its empirical justification rather than as a preference.
+
+- **The Trajectory suite gained the assertions that would have caught this.**
+  `trajcheck.mjs` is now 52 checks (from 33). The new ones do not assert on the
+  CSS rule; they plant a control with the offending class back into the panel,
+  at the same geometry, and require that it cannot shadow the close button —
+  then remove the skin's rule and confirm the check goes red. A synthetic
+  `click()` was explicitly not used: it bypasses hit-testing and would have
+  passed while the panel was still unusable, which is how the defect survived a
+  round of "verification" already. The decisive assertions drive real touch
+  input, and close with the panel reopening cleanly afterwards.
+
+- **`devtools/linttemplates.mjs`** — a new static check guarding the mistake that
+  broke this directory twice. A `page.evaluate` page function is passed as a
+  template literal, and inside a template literal a `//` comment is just text,
+  so a backtick in a comment terminates the template and the syntax error points
+  at the wrong line. Both previous occurrences were in comments *documenting* a
+  measurement. The checker is wired into `run-suite.sh`, and is itself verified
+  against a known-bad canary — its first two implementations passed that canary,
+  which is recorded in the file.
+
+### Changed
+
+- **npm is gone from every user-facing document.** The maintainer has no npm
+  account, so no installation instruction anywhere mentions it: both READMEs, the
+  landing page, `install.sh`, `install.ps1` and `packages/frutiger-aero/README.md`
+  now have zero references (verified by search, not by memory). The landing
+  page's npm method card was removed and the GitHub installer promoted to
+  `1 · GitHub installer` with a `recommended` tag; the two npm shields in the
+  README were replaced with the CI badge; and the installer's own header now
+  says "no package manager, no registry account, no git, no build step".
+
+- `.github/workflows/publish.yml` and `RELEASE.md` §6 are **kept but marked
+  inactive** rather than deleted, so the work is not lost if an npm account ever
+  appears. The workflow skips itself cleanly while `NPM_TOKEN` is unset, so the
+  repository never shows a red X for something that is deliberately not done.
+
 ## [1.0.4] — 2026-09-21
 
 ### Fixed
@@ -106,6 +182,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the wide layout did not move — row height, gutter sticky-ness, cursor, type
   scale, label column, plot height, and the absence of the phone-only hit strip
   and fade mask.
+
 
 ## [1.1.0] — 2026-09-20
 

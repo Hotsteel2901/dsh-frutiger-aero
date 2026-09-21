@@ -11,6 +11,19 @@
  * returns the page to stock. That restraint is what makes a reskin this total
  * safe to ship: if any part of it fails, the app underneath is untouched.
  *
+ * That rule is not decoration and it was tested the hard way. An attempt to
+ * fix the Trajectory inspector by re-parenting the panel onto `document.body`
+ * (a "portal", to escape the isolated stacking context that sits under the
+ * composer) made the geometry perfect — `elementFromPoint` escapes went 6 -> 0
+ * — and broke the panel outright. The panel is React-rendered and the app
+ * attaches its event listeners to `#root`; a node moved outside that subtree
+ * receives a click and does nothing with it, because the delegated listener
+ * never sees it. Measured: after the move, `close` and every detail tab
+ * reported a correct target and none of them responded, and moving the node
+ * back did not repair the fiber's own bookkeeping. The fix that works is CSS
+ * and only CSS — see the note in `src/css/mobile.css`. Moving product nodes is
+ * out, permanently, and this paragraph is why.
+ *
  * ## The four layers
  *
  * 1. **Tokens** — the palette from `./palette.js`, written twice: as an

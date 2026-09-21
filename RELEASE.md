@@ -19,11 +19,17 @@ Why this one:
   "glass theme plugin", plenty of people type "frutiger aero";
 - it is unclaimed: a GitHub search for `dsh frutiger aero` returns **0 repositories**, and none
   of the ~3,900 plugins in the curated registry uses the name;
-- it matches the npm package name exactly (`dsh-frutiger-aero`), which matters because the
-  registry maps a listing to its npm package by name.
+- it matches the `name` field in `packages/frutiger-aero/package.json` (`dsh-frutiger-aero`),
+  which keeps the package self-consistent if it is ever published to a registry.
 
-The npm package name is baked into `packages/frutiger-aero/package.json` and into every install
-command in the docs. **If you pick a different repository name, the npm package name can stay
+> **Not on npm, and not going to be.** The maintainer has no npm account, so nothing here is
+> published to the registry and no user-facing document tells anyone to install from it. The
+> `name` field stays because it is what the package calls itself and what an installer would
+> use to look it up locally — changing it would be churn for no benefit. Sections below that
+> mention npm are marked as **inactive**.
+
+The package name is baked into `packages/frutiger-aero/package.json` and referenced by the
+installers. **If you pick a different repository name, the package name can stay
 `dsh-frutiger-aero`** — they do not have to match — but if you would rather change both, say so
 and it is a one-pass rename.
 
@@ -134,11 +140,23 @@ mechanisms must not both be configured.
 
 ---
 
-## 6 · npm
+## 6 · npm — **INACTIVE, THIS RELEASE DOES NOT USE IT**
+
+> ══ **Currently not in use. Kept for reference only.** ══
+> The maintainer has **no npm account**, so this package is not published to the registry and
+> must not be. Every user-facing document — both READMEs, the landing page, `install.sh`,
+> `install.ps1`, `packages/frutiger-aero/README.md` — was stripped of npm instructions on
+> purpose; `grep -rn npm` over them returns **0 hits**. Installation goes through the GitHub
+> installer instead: `curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh`.
+> Nothing in this section needs to be done, and nothing breaks by leaving it undone.
+> `.github/workflows/publish.yml` is still present but **skips itself** while `NPM_TOKEN` is
+> unset, reporting a notice rather than a failure.
+
+Should an npm account ever appear, this is the path — otherwise skip to §7.
 
 The one-liner (`dsh plugin --profile web add dsh-frutiger-aero`) is what the ecosystem reaches
-for first, and the registry tracks npm downloads as its popularity signal. Publishing also makes
-the shields.io badges in the README resolve.
+for first, and the registry tracks npm downloads as its popularity signal. Publishing would also
+make the shields.io badges in the README resolve.
 
 ```sh
 cd packages/frutiger-aero
@@ -185,8 +203,11 @@ questions once it is up.
 - [x] Pages enabled, landing page live at <https://hotsteel2901.github.io/dsh-frutiger-aero/> — 19/19 checks pass against the live site
 - [x] Release published from `CHANGELOG.md` (<https://github.com/Hotsteel2901/dsh-frutiger-aero/releases/tag/v1.0.0>)
 - [ ] **Registry PR** — prepared in `submission/`, deliberately left to you (see step 7)
-- [ ] **npm published** — needs an npm account; the GitHub token cannot do it (see below)
-- [ ] `dsh plugin --profile web add dsh-frutiger-aero` verified on a clean profile (blocked on npm)
+- [x] ~~**npm published**~~ — **n/a, deliberately not done**: the maintainer has no npm account,
+      all npm install instructions were removed from user-facing docs, and the task is obsolete
+- [x] ~~`dsh plugin --profile web add dsh-frutiger-aero` on a clean profile~~ — **n/a for the same
+      reason.** The equivalent verification is the GitHub installer on a clean profile, covered
+      by `installcheck.mjs` (15/15)
 - [ ] **Rotate the GitHub token** that was used for the push
 - [x] `v1.0.4` tagged and pushed — the tag carries the release notes, because
       (see below) the token in use cannot create a Release object
@@ -222,26 +243,24 @@ the *old* tag `1.0.3`, the installer kept working correctly anyway — it resolv
 the default branch, not the latest release. That was the whole point of moving it
 off `releases/latest`, and this was an unplanned demonstration of it.
 
-### The two that need you
+### The one that needs you
 
 **Social preview.** GitHub has no API for it. Settings → General → Social preview → upload
 `docs/assets/og.jpg`. Until then every shared link renders a grey card.
 
-**npm.** The publish workflow is in place and skips itself cleanly while `NPM_TOKEN` is unset, so
-the repository never shows a red X for it. To publish:
+**npm — not a task any more.** The maintainer has no npm account, and the whole category was
+removed from the product rather than left half-documented:
 
-```sh
-cd packages/frutiger-aero
-npm login
-npm publish --access public
-```
+- all npm install instructions are gone from both READMEs, the landing page, `install.sh`,
+  `install.ps1`, and `packages/frutiger-aero/README.md` (0 hits for `npm` across all six);
+- `.github/workflows/publish.yml` stays but is annotated **inactive** — while `NPM_TOKEN` is
+  unset it skips itself and reports a notice, so the repo never shows a red X for it;
+- §6 above is kept as reference, with a header saying so.
 
-…or add an `NPM_TOKEN` repository secret (npm automation token, publish rights) and re-run the
-*Publish to npm* workflow. Tags only — it never publishes from a branch push, and it fails the
-build if the committed `lib/` does not match `src/`.
-
-Once npm is live, three things resolve at once: the one-liner install works, the two shields.io
-badges in the README start rendering, and the registry can map the listing to its download stats.
+The three things npm would have bought were all replaced rather than lost: the installer
+one-liner (`install.sh`, no registry account needed) replaced the `dsh plugin add` one-liner;
+the CI badge replaced the two npm shields; and the registry download signal is simply forgone —
+the listing's popularity is measured by GitHub stars, which the repo already has.
 
 ## 9 · After the release
 

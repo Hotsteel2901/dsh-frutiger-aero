@@ -17,6 +17,39 @@ set -u
 HERE="$(cd "$(dirname "$0")" && pwd)"
 URL="${1:-}"
 
+# Pick a Node that satisfies this project's own floor.
+#
+# The install suite exercises `install.mjs`, which refuses to run below Node 24
+# — by design, because the Harness CLI silently exits 0 on 20 and 22. So running
+# the suite under whatever `node` happens to be first on PATH produced a red
+# "install, doctor and repair" on a machine whose default is 22, while the very
+# same check passed when invoked with an explicit Node 24. That is the worst
+# kind of failure: the suite blaming the code for the interpreter it chose.
+#
+# Prefer an already-correct PATH node; otherwise look in the usual places and
+# fall back to PATH with a warning, so the failure is attributed honestly.
+NODE_BIN=""
+if command -v node >/dev/null 2>&1; then
+  major="$(node -v 2>/dev/null | sed 's/^v//; s/\..*//')"
+  [ -n "$major" ] && [ "$major" -ge 24 ] 2>/dev/null && NODE_BIN="$(command -v node)"
+fi
+if [ -z "$NODE_BIN" ]; then
+  for candidate in /opt/node-v24.*/bin/node /usr/local/bin/node /opt/node*/bin/node; do
+    [ -x "$candidate" ] || continue
+    major="$("$candidate" -v 2>/dev/null | sed 's/^v//; s/\..*//')"
+    if [ -n "$major" ] && [ "$major" -ge 24 ] 2>/dev/null; then NODE_BIN="$candidate"; break; fi
+  done
+fi
+if [ -z "$NODE_BIN" ]; then
+  NODE_BIN="$(command -v node || echo node)"
+  echo "warning: no Node >= 24 found; using $NODE_BIN ($("$NODE_BIN" -v 2>/dev/null))" >&2
+  echo "         the install suite will report a genuine Node-floor failure." >&2
+  echo >&2
+fi
+# Put it first so every `node ...` in this script and its children agree.
+PATH="$(dirname "$NODE_BIN"):$PATH"
+export PATH
+
 if [ -z "$URL" ]; then
   # Fall back to the most recent token URL this sandbox printed.
   URL="$(grep -o 'http://[^ ]*token=[A-Za-z0-9]*' /tmp/fa-x.log 2>/dev/null | tail -1)"
@@ -26,6 +59,7 @@ if [ -z "$URL" ]; then
   exit 2
 fi
 echo "target: ${URL%%\?*}"
+echo "node:   $("$NODE_BIN" -v) ($NODE_BIN)"
 echo
 
 PASS=0
@@ -102,6 +136,14 @@ run "no unexpected 4xx/5xx" node "$HERE/netcheck.mjs" "$URL"
 # and build reproducibility — which is where "it failed to install" comes from.
 echo "── the install path ──────────────────────────────────────────────"
 run "install, doctor and repair" node "$HERE/installcheck.mjs"
+
+# Static, so it runs whatever the state of the harness, and it belongs beside
+# the install check for the same reason: a green suite that could not have gone
+# red is not evidence. This one guards a mistake that has broken this directory
+# twice — a backtick in a comment inside a `page.evaluate` template terminates
+# the template, and the resulting syntax error points at the wrong line.
+echo "── the probes themselves ─────────────────────────────────────────"
+run "no page.evaluate template is cut short" node "$HERE/linttemplates.mjs"
 
 echo
 echo "══════════════════════════════════════════════════════════════════"

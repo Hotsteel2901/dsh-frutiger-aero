@@ -117,8 +117,8 @@
             </p>
 
             <div class="cmd">
-              <code id="cmd-npm">dsh plugin --profile web add dsh-frutiger-aero</code>
-              <button class="btn cmd__copy" type="button" data-copy="cmd-npm" aria-label="Copy the install command">
+              <code id="cmd-install">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+              <button class="btn cmd__copy" type="button" data-copy="cmd-install" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>
                   <span class="cmd__label" data-lang-block="zh">复制</span>
                   <span class="cmd__done" data-lang-block="en">Copied</span>
@@ -459,25 +459,24 @@
             <h2 data-lang-block="en">Install</h2>
             <h2 data-lang-block="zh">安装</h2>
             <p data-lang-block="en">
-              Three ways in. The first needs only <code>dsh</code> and a package manager; the second
-              needs neither an npm account nor git; the third is for hacking on the plugin itself.
+              One line in. No package manager, no registry account, no build step; the second way
+              is for hacking on the plugin itself.
             </p>
             <p data-lang-block="zh">
-              三种方式。第一种只需要 <code>dsh</code> 和包管理器；第二种既不需要 npm 账号也不需要
-              git；第三种是给要改插件本身的人用的。
+              一行命令搞定。不用包管理器、不用 registry 账号、不用构建；第二种是给要改插件本身的人用的。
             </p>
           </div>
 
           <div class="methods">
             <div class="method glass glossy reveal">
               <h3>
-                <span data-lang-block="en">1 · npm one-liner</span>
-                <span data-lang-block="zh">1 · npm 一行命令</span>
+                <span data-lang-block="en">1 · GitHub installer</span>
+                <span data-lang-block="zh">1 · GitHub 安装脚本</span>
                 <span class="tag" data-lang-block="en">recommended</span>
                 <span class="tag" data-lang-block="zh">推荐</span>
               </h3>
               <div class="cmd">
-                <code id="cmd-1">dsh plugin --profile web add dsh-frutiger-aero</code>
+                <code id="cmd-1">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
                 <button class="btn cmd__copy" type="button" data-copy="cmd-1" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>
                   <span class="cmd__label" data-lang-block="zh">复制</span>
@@ -486,48 +485,26 @@
                 </button>
               </div>
               <p data-lang-block="en">
-                Installs the latest version and registers it as a profile bundle. Reload the web UI
-                and it is on.
-              </p>
-              <p data-lang-block="zh">装上最新版本并注册为 profile bundle。刷新网页界面即可生效。</p>
-            </div>
-
-            <div class="method glass glossy reveal">
-              <h3>
-                <span data-lang-block="en">2 · GitHub installer</span>
-                <span data-lang-block="zh">2 · GitHub 安装脚本</span>
-                <span class="tag" data-lang-block="en">no npm account</span>
-                <span class="tag" data-lang-block="zh">无需 npm 账号</span>
-              </h3>
-              <div class="cmd">
-                <code id="cmd-2">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
-                <button class="btn cmd__copy" type="button" data-copy="cmd-2" aria-label="Copy the install command">
-                  <span class="cmd__label" data-lang-block="en">Copy</span>
-                  <span class="cmd__label" data-lang-block="zh">复制</span>
-                  <span class="cmd__done" data-lang-block="en">Copied</span>
-                  <span class="cmd__done" data-lang-block="zh">已复制</span>
-                </button>
-              </div>
-              <p data-lang-block="en">
-                Downloads the latest release and installs it into a profile — no package manager, no
-                build step. On Windows, use <code>install.ps1</code> from the repository instead.
+                Downloads the repository and installs it into a profile — no package manager, no
+                registry, no build step. Needs <strong>Node 24 or newer</strong>. On Windows, use
+                <code>install.ps1</code> from the repository instead.
               </p>
               <p data-lang-block="zh">
-                下载最新发布版并装进 profile —— 不需要包管理器，也不需要构建。Windows 请改用仓库里的
-                <code>install.ps1</code>。
+                下载仓库并装进 profile —— 不需要包管理器、不需要 registry、也不需要构建。
+                需要 <strong>Node 24 或更新版本</strong>。Windows 请改用仓库里的 <code>install.ps1</code>。
               </p>
             </div>
 
             <div class="method glass glossy reveal">
               <h3>
-                <span data-lang-block="en">3 · From a clone</span>
-                <span data-lang-block="zh">3 · 从克隆仓库安装</span>
+                <span data-lang-block="en">2 · From a clone</span>
+                <span data-lang-block="zh">2 · 从克隆仓库安装</span>
                 <span class="tag" data-lang-block="en">for development</span>
                 <span class="tag" data-lang-block="zh">开发用</span>
               </h3>
               <div class="cmd">
-                <code id="cmd-3">git clone https://github.com/Hotsteel2901/dsh-frutiger-aero &amp;&amp; cd dsh-frutiger-aero &amp;&amp; node install.mjs</code>
-                <button class="btn cmd__copy" type="button" data-copy="cmd-3" aria-label="Copy the install command">
+                <code id="cmd-2">git clone https://github.com/Hotsteel2901/dsh-frutiger-aero &amp;&amp; cd dsh-frutiger-aero &amp;&amp; node install.mjs</code>
+                <button class="btn cmd__copy" type="button" data-copy="cmd-2" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>
                   <span class="cmd__label" data-lang-block="zh">复制</span>
                   <span class="cmd__done" data-lang-block="en">Copied</span>

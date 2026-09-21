@@ -5,10 +5,11 @@
 #   curl -fsSL .../install.sh | sh -s -- --profile aero
 #   curl -fsSL .../install.sh | sh -s -- --ref main      # pin a specific ref
 #
-# Needs nothing but Node and either curl or wget. No npm account, no git, no
-# build step. It downloads a snapshot of this repository and hands over to the
-# bundled `install.mjs` — the logic lives in exactly one place, in Node, where it
-# can be tested, rather than being reimplemented in shell for this path.
+# Needs nothing but Node and either curl or wget. No package manager, no
+# registry account, no git, no build step. It downloads a snapshot of this
+# repository and hands over to the bundled `install.mjs` — the logic lives in
+# exactly one place, in Node, where it can be tested, rather than being
+# reimplemented in shell for this path.
 #
 # ## Which ref gets installed, and why it is not "the latest release"
 #

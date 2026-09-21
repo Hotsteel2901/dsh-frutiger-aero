@@ -162,17 +162,270 @@ async function swipe(cdp, from, to, steps = 14) {
   check('inspector is an overlay at this width', det !== null && det.position === 'absolute', det ? det.position : '—')
   check('inspector close button reach extended past its box', det !== null && det.closeHit !== null && det.closeHit.afterContent !== 'none' && parseFloat(det.closeHit.afterH) >= 44, det && det.closeHit ? `${det.closeHit.w}x${det.closeHit.h} + ::after ${det.closeHit.afterW}x${det.closeHit.afterH}` : '—')
 
+  // ── the panel must actually *receive* the taps it looks like it receives ──
+  //
+  // Opaque paint was necessary and nowhere near sufficient. The panel kept
+  // leaking taps to the table behind it, and the cause was not the surface at
+  // all: `_timestampToggle` lives inside a summary preview that is
+  // `overflow: auto` with `scrollHeight > clientHeight`, and Chromium hit-tests
+  // a scroll container's descendants using their **unclipped** rects. That
+  // escaped rect covered the entire panel, so `elementFromPoint` returned the
+  // toggle for the close button, for the detail tabs, and for blank panel
+  // space alike — every control was shadowed by one element nobody could see.
+  //
+  // Two dead ends are recorded so they are not retried:
+  //   · portalling the panel onto `document.body` fixed the geometry
+  //     (escapes 6 -> 0) and broke the panel outright, because React and the
+  //     app's delegated listeners live on `#root`;
+  //   · raising `z-index` / neutralising the `isolation: isolate` ledger
+  //     changed nothing, because siblings are not what overlap here.
+  // The fix that works is one CSS rule, `html .Y0dWHa_timestampToggle
+  // { pointer-events: none }` — the `html` prefix is load-bearing against a
+  // later unconditional rule of the same class.
+  //
+  // These assertions pin the *effect*, not the rule, so the CSS may be
+  // reorganised without breaking them.
+  const hit = await page.evaluate(`(() => {
+    const panel = document.querySelector('aside[aria-label]')
+    if (!panel) return null
+    const root = panel.getBoundingClientRect()
+    const toggles = [...panel.querySelectorAll('[class*="timestampToggle"]')]
+    const escaped = toggles.filter((t) => {
+      const b = t.getBoundingClientRect()
+      // A control inside the panel is fine; one whose rect spills *outside* the
+      // panel's own box is the shadowing shape, whatever its visible size.
+      return b.width > root.width + 8 || b.height > root.height + 8 || b.right > root.right + 8 || b.bottom > root.bottom + 8
+    })
+    // Probe points a real thumb would use: the close control, three detail-tab
+    // centres, and one deliberately blank spot inside the panel.
+    const close = panel.querySelector('button[class*="close"]') || panel.querySelector('button')
+    const tabs = [...panel.querySelectorAll('[role="tab"], button')].filter((b) => {
+      const b2 = b.getBoundingClientRect()
+      return b2.top > root.top && b2.bottom < root.bottom && b2.width > 10
+    })
+    const at = (x, y) => {
+      const el = document.elementFromPoint(Math.round(x), Math.round(y))
+      return el ? { cls: typeof el.className === 'string' ? el.className.split(/\\s+/)[0] : '', tag: el.tagName, inPanel: panel.contains(el) } : null
+    }
+    const probes = {}
+    if (close) { const b = close.getBoundingClientRect(); probes.close = at(b.left + b.width / 2, b.top + b.height / 2) }
+    probes.blank = at(root.left + root.width / 2, root.top + root.height * 0.62)
+    probes.tabs = tabs.slice(0, 4).map((t) => {
+      const b = t.getBoundingClientRect()
+      const hitEl = at(b.left + b.width / 2, b.top + b.height / 2)
+      return { label: (t.textContent || '').trim().slice(0, 6), hit: hitEl, selfHit: panel.contains(document.elementFromPoint(Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2))) }
+    })
+    return {
+      escaped: escaped.length,
+      escapedDetail: escaped.map((t) => { const b = t.getBoundingClientRect(); return \`\${Math.round(b.left)},\${Math.round(b.top)} \${Math.round(b.width)}x\${Math.round(b.height)}\` }),
+      panelBox: \`\${Math.round(root.left)},\${Math.round(root.top)} \${Math.round(root.width)}x\${Math.round(root.height)}\`,
+      probes,
+      // Null when no such control is present, which is the honest answer and
+      // not a failure — the desktop panel simply does not render one.
+      togglePE: toggles.length ? getComputedStyle(toggles[0]).pointerEvents : null,
+    }
+  })()`)
+  console.log('   ', JSON.stringify(hit))
+  check('no control has escaped the panel box', hit !== null && hit.escaped === 0, hit ? (hit.escaped ? hit.escapedDetail.join(' | ') : 'none') : '—')
+  // Presence is content-dependent: the toggle only renders on a record that was
+  // summarised. Asserting `pointer-events === 'none'` unconditionally made this
+  // line red on a fixture that has no such control, which is a check that
+  // cannot go green rather than a defect. So the assertions below do not depend
+  // on the product's content: a synthetic control is planted in the panel to
+  // reproduce the exact shape that caused the outage — an unclipped rect
+  // escaping a scroll container — and the invariant is measured against it.
+  // That is the version of this check that would have caught the real bug.
+  const escape = await page.evaluate(`(() => {
+    const panel = document.querySelector('aside[aria-label]')
+    if (!panel) return { err: 'no panel' }
+    const root = panel.getBoundingClientRect()
+
+    // Reproduce the defect's geometry faithfully: a 20px-tall button inside a
+    // 57px-tall scroll container holding more content than it can show. Before
+    // the fix, the button's *layout* rect covered the panel and Chromium
+    // hit-tested that rect rather than the clipped one.
+    //
+    // The strip is anchored to cover the close button's row, not to mimic the
+    // product's lower placement. An earlier version anchored it at the panel's
+    // bottom, where the escaped rect only covered the lower third — the
+    // pointer-events assertion still discriminated, but the "is the close
+    // button reachable" assertion passed whether or not the fix was present.
+    // A check that cannot fail is worse than no check, so the strip is placed
+    // where shadowing would actually do damage.
+    const closeEl = panel.querySelector('button[class*="close"]') || panel.querySelector('button')
+    const closeBox = closeEl ? closeEl.getBoundingClientRect() : null
+    const stripTop = closeBox ? Math.max(0, Math.round(closeBox.top - root.top) - 6) : 0
+
+    const probe = document.createElement('div')
+    probe.setAttribute('data-fa-escape-probe', '1')
+    probe.style.cssText = 'position:absolute;inset:0;pointer-events:none;'
+    const strip = document.createElement('div')
+    strip.style.cssText = 'position:absolute;left:8px;right:8px;top:' + stripTop + 'px;height:57px;overflow:auto;'
+    const spacer = document.createElement('div')
+    spacer.style.cssText = 'height:70px;'
+    const ctl = document.createElement('button')
+    ctl.className = 'Y0dWHa_timestampToggle'
+    // Full width, because that is what made the real defect fatal. The product's
+    // escaped control measured 146x20 yet shadowed a panel 358px wide, and the
+    // close button sits at the panel's far right — so a probe control only as
+    // wide as its own text would sit at the left edge and cover nothing that
+    // matters. The escape is horizontal as well as vertical, and both
+    // dimensions have to be reproduced for the check to mean anything.
+    ctl.style.cssText = 'height:20px;width:100%;display:block;'
+    ctl.textContent = 'probe'
+    strip.append(ctl, spacer)
+    probe.append(strip)
+    panel.append(probe)
+    // Let layout settle before measuring.
+    void panel.offsetHeight
+
+    const b = ctl.getBoundingClientRect()
+    const escapes = b.width > root.width + 8 || b.height > root.height + 8 || b.right > root.right + 8 || b.bottom > root.bottom + 8
+    const pe = getComputedStyle(ctl).pointerEvents
+    const hitAtClose = (() => {
+      const c = panel.querySelector('button[class*="close"]')
+      if (!c) return null
+      const cb = c.getBoundingClientRect()
+      return document.elementFromPoint(Math.round(cb.left + cb.width / 2), Math.round(cb.top + cb.height / 2))
+    })()
+    const closeReached = hitAtClose !== null && panel.contains(hitAtClose) && !/timestampToggle/.test(String(hitAtClose.className))
+    // Does the planted control actually cover the close button's centre? If it
+    // does not, the reachability assertion below proves nothing and must be
+    // reported as inconclusive rather than green.
+    //
+    // Tested by *point containment*, not by comparing bounding boxes. An
+    // earlier version compared the two rects and reported a false negative for
+    // a control that demonstrably shadowed the button — the rects do intersect,
+    // but the band comparison was not the question. The question is whether the
+    // escaped control sits at the pixel elementFromPoint was asked about.
+    //
+    // The strip offset is measured from the host overlay (which is absolutely
+    // positioned and fills the panel) rather than from the panel, so the offset
+    // is the distance from the panel's own top edge — get that wrong and the
+    // strip lands somewhere harmless and the check goes quietly green.
+    const cs = closeBox ? { x: Math.round(closeBox.left + closeBox.width / 2), y: Math.round(closeBox.top + closeBox.height / 2) } : null
+    const coversClosePoint = cs !== null &&
+      cs.x >= b.left && cs.x <= b.right && cs.y >= b.top && cs.y <= b.bottom
+    probe.remove()
+    return {
+      layoutRect: \`\${Math.round(b.left)},\${Math.round(b.top)} \${Math.round(b.width)}x\${Math.round(b.height)}\`,
+      panelBox: \`\${Math.round(root.left)},\${Math.round(root.top)} \${Math.round(root.width)}x\${Math.round(root.height)}\`,
+      escapes, pe, closeReached, coversClosePoint,
+      closePoint: cs ? \`\${cs.x},\${cs.y}\` : null,
+    }
+  })()`)
+  console.log('   ', JSON.stringify(escape))
+  // This is the load-bearing assertion of the whole section. With the same
+  // class the product uses planted back into the panel, the skin's rule must
+  // still neutralise it — proving the fix is a general invariant on that
+  // control rather than a one-off state that happened to be measured.
+  //
+  // Verified to discriminate rather than merely to pass, by injecting a later
+  // `pointer-events: auto !important` over the same selector: the planted
+  // control then reports `auto` and the close button's own pixel resolves to
+  // the planted control, so both assertions below go red. A check that cannot
+  // fail is worse than no check.
+  check('the fix neutralises the shadowing class wherever it appears', escape !== undefined && escape.pe === 'none', escape ? `planted control -> pointer-events: ${escape.pe}; layout rect ${escape.layoutRect} vs panel ${escape.panelBox}` : '—')
+  check('the planted control covers the close button’s own pixel', escape !== undefined && escape.coversClosePoint === true, escape ? (escape.coversClosePoint ? `covers ${escape.closePoint} — the check below is meaningful` : `does NOT cover ${escape.closePoint} — check below is inconclusive`) : '—')
+  check('a planted shadowing control cannot shadow the close button', escape !== undefined && escape.coversClosePoint === true && escape.closeReached === true, escape ? (escape.closeReached ? 'close still reachable' : 'close shadowed by the planted control') : '—')
+  check('the shadowing control renders with a passive computed style', hit !== null && (hit.togglePE === null || hit.togglePE === 'none'), hit && hit.togglePE === null ? 'n/a — no such control in this record’s content' : (hit ? String(hit.togglePE) : '—'))
+  check('elementFromPoint at the close button reaches the close button', hit !== null && hit.probes.close !== null && hit.probes.close.inPanel && !/timestampToggle/.test(hit.probes.close.cls), hit && hit.probes.close ? `${hit.probes.close.tag}.${hit.probes.close.cls}` : '—')
+  check('elementFromPoint at blank panel space stays inside the panel', hit !== null && hit.probes.blank !== null && hit.probes.blank.inPanel && !/timestampToggle/.test(hit.probes.blank.cls), hit && hit.probes.blank ? `${hit.probes.blank.tag}.${hit.probes.blank.cls}` : '—')
+  check('every detail tab is the topmost thing at its own centre', hit !== null && hit.probes.tabs.length >= 3 && hit.probes.tabs.every((t) => t.selfHit), hit ? hit.probes.tabs.map((t) => `${t.label}:${t.selfHit ? 'ok' : 'blocked'}`).join(' ') : '—')
+
+  // The hit-test above is the mechanism; this is the outcome, driven by real
+  // touch input rather than a synthetic `click()`. A `click()` on the element
+  // bypasses hit-testing entirely and would have passed while the panel was
+  // still unusable — which is exactly how the defect survived an earlier round.
+  const tabBefore = await page.evaluate(`(() => { const t = document.querySelector('aside[aria-label] [role="tab"][aria-selected="true"]') || document.querySelector('aside[aria-label] [aria-selected="true"]'); return t ? (t.textContent || '').trim().slice(0, 6) : null })()`)
+  const tabTarget = await page.evaluate(`(() => {
+    const panel = document.querySelector('aside[aria-label]')
+    if (!panel) return null
+    const root = panel.getBoundingClientRect()
+    const tabs = [...panel.querySelectorAll('[role="tab"], button')].filter((b) => {
+      const r = b.getBoundingClientRect()
+      return r.top > root.top + 40 && r.bottom < root.bottom && r.width > 30 && r.height > 20 && (b.getAttribute('aria-selected') !== 'true')
+    })
+    const t = tabs[1] || tabs[0]
+    if (!t) return null
+    const b = t.getBoundingClientRect()
+    return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2), label: (t.textContent || '').trim().slice(0, 6) }
+  })()`)
+  if (tabTarget) {
+    await page.touchscreen.tap(tabTarget.x, tabTarget.y)
+    await page.waitForTimeout(1200)
+    const tabAfter = await page.evaluate(`(() => { const t = document.querySelector('aside[aria-label] [role="tab"][aria-selected="true"]') || document.querySelector('aside[aria-label] [aria-selected="true"]'); return t ? (t.textContent || '').trim().slice(0, 6) : null })()`)
+    check('a real touch switches the detail tab', tabAfter === tabTarget.label, `${tabBefore} -> ${tabAfter} (aimed at ${tabTarget.label})`)
+  } else {
+    check('a real touch switches the detail tab', false, 'no second tab found to aim at')
+  }
+
+  // Closing is the last thing to verify, because it destroys the state the two
+  // checks above depend on. It is also the check that would have failed most
+  // loudly: the close button was the control most reliably shadowed.
+  const closePt = await page.evaluate(`(() => {
+    const panel = document.querySelector('aside[aria-label]')
+    if (!panel) return null
+    const c = panel.querySelector('button[class*="close"]') || panel.querySelector('button')
+    if (!c) return null
+    const b = c.getBoundingClientRect()
+    return { x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) }
+  })()`)
+  if (closePt) {
+    await page.touchscreen.tap(closePt.x, closePt.y)
+    await page.waitForTimeout(1200)
+    const stillOpen = await page.evaluate(`document.querySelector('aside[aria-label]') !== null`)
+    check('a real touch on close dismisses the inspector', !stillOpen, stillOpen ? 'still open' : 'dismissed')
+
+    // And it must come back cleanly — the portalled attempt leaked an attribute
+    // that survived reopen and is asserted against here so it cannot return.
+    const row = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('[data-trajectory-scroll] tr[data-trajectory-row-key]')]
+      const r = rows.find(x => { const b = x.getBoundingClientRect(); return b.top > 180 && b.bottom < 680 })
+      if (!r) return null
+      const b = r.getBoundingClientRect()
+      return { x: Math.round(r.querySelector('td:last-child').getBoundingClientRect().left + 120), y: Math.round(b.top + b.height / 2) }
+    })()`)
+    if (row) {
+      await page.touchscreen.tap(row.x, row.y)
+      await page.waitForTimeout(1400)
+      const reopen = await page.evaluate(`(() => {
+        const panel = document.querySelector('aside[aria-label]')
+        return {
+          present: panel !== null,
+          portaled: document.querySelectorAll('[data-fa-portaled]').length,
+          onBody: panel ? panel.parentElement === document.body : null,
+        }
+      })()`)
+      check('inspector reopens after being dismissed', reopen.present, reopen.present ? 'present' : 'absent')
+      check('inspector is not parented outside the React root', reopen.portaled === 0 && reopen.onBody !== true, `portaled=${reopen.portaled} onBody=${reopen.onBody}`)
+      // Re-probe after the reopen: a re-render must not reintroduce the escape.
+      const reEscaped = await page.evaluate(`(() => {
+        const panel = document.querySelector('aside[aria-label]')
+        if (!panel) return -1
+        const root = panel.getBoundingClientRect()
+        return [...panel.querySelectorAll('[class*="timestampToggle"]')].filter((t) => {
+          const b = t.getBoundingClientRect()
+          return b.width > root.width + 8 || b.height > root.height + 8 || b.right > root.right + 8 || b.bottom > root.bottom + 8
+        }).length
+      })()`)
+      check('reopened inspector still has no escaped control', reEscaped === 0, String(reEscaped))
+    }
+  } else {
+    check('a real touch on close dismisses the inspector', false, 'no close button found')
+  }
+
   // Row hit area: a strip that fills the gap *between* rows, so a near miss
   // lands on the row it was aimed at. Asserted on the resolved box rather than
   // on the row height, which must not move.
-  const hit = await page.evaluate(`(() => {
+  const shadowHit = await page.evaluate(`(() => {
     const td = document.querySelector('[data-trajectory-scroll] tr[data-trajectory-row-key] > td:last-child')
     const a = getComputedStyle(td, '::after')
     const row = td.parentElement.getBoundingClientRect()
     return { content: a.content, bottom: a.bottom, height: a.height, pos: getComputedStyle(td).position, rowH: Math.round(row.height) }
   })()`)
-  check('row gap gets a hit strip', hit.content !== 'none' && hit.bottom === '-7px' && hit.height === '7px' && hit.pos === 'relative', JSON.stringify(hit))
-  check('row height still 30px after the hit-area change', hit.rowH === 30, `${hit.rowH}px`)
+  check('row gap gets a hit strip', shadowHit.content !== 'none' && shadowHit.bottom === '-7px' && shadowHit.height === '7px' && shadowHit.pos === 'relative', JSON.stringify(shadowHit))
+  check('row height still 30px after the hit-area change', shadowHit.rowH === 30, `${shadowHit.rowH}px`)
 
   // The strip must not sit on top of the inner scrollers, or it eats the
   // horizontal drag. This is the assertion that would have caught the first
@@ -356,6 +609,67 @@ async function swipe(cdp, from, to, steps = 14) {
   check('desktop: timeline label column and type untouched', dtl.cols === '44px' || String(dtl.cols).startsWith('44px'), String(dtl.cols))
   check('desktop: timeline label type untouched', dtl.labelsFont === '10px', String(dtl.labelsFont))
   check('desktop: timeline plot height untouched', dtl.plotH === '50px', String(dtl.plotH))
+
+  // Hard constraint from the brief: none of this may touch the desktop. The
+  // panel fix is a phone-only rule inside the coarse-pointer media query, and
+  // these are the assertions that say so — the desktop inspector must be its
+  // own node in its own place, and its controls must be reachable the ordinary
+  // way. If a future change reaches for a global rule, this block fails.
+  //
+  // The inspector has to be opened first: nothing above this point on the
+  // desktop path taps a row, and an earlier version of this block asserted
+  // against a panel that was never on screen — five red lines that measured
+  // nothing. The `panelPresent` readout from the block above is what caught
+  // it, and it is kept as the guard.
+  if (leak.panelPresent !== true) {
+    const rowPt = await page.evaluate(`(() => {
+      const rows = [...document.querySelectorAll('[data-trajectory-scroll] tr[data-trajectory-row-key]')]
+      const r = rows.find(x => { const b = x.getBoundingClientRect(); return b.top > 200 && b.bottom < 780 })
+      if (!r) return null
+      const b = r.getBoundingClientRect()
+      return { x: Math.round(r.querySelector('td:last-child').getBoundingClientRect().left + 160), y: Math.round(b.top + b.height / 2) }
+    })()`)
+    if (rowPt) {
+      await page.mouse.click(rowPt.x, rowPt.y)
+      await page.waitForTimeout(1400)
+    }
+  }
+  check('desktop: a row click opens the inspector', (await page.evaluate(`document.querySelector('aside[aria-label]') !== null`)), 'needed for the checks below')
+
+  const dfix = await page.evaluate(`(() => {
+    const panel = document.querySelector('aside[aria-label]')
+    if (!panel) return null
+    const root = panel.getBoundingClientRect()
+    const inRoot = document.getElementById('root')
+    const toggles = [...panel.querySelectorAll('[class*="timestampToggle"]')]
+    const escaped = toggles.filter((t) => {
+      const b = t.getBoundingClientRect()
+      return b.width > root.width + 8 || b.height > root.height + 8 || b.right > root.right + 8 || b.bottom > root.bottom + 8
+    }).length
+    const close = panel.querySelector('button[class*="close"]') || panel.querySelector('button')
+    let closeHit = null
+    if (close) {
+      const b = close.getBoundingClientRect()
+      const el = document.elementFromPoint(Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2))
+      closeHit = {
+        reached: el !== null && (el === close || close.contains(el)),
+        cls: el && typeof el.className === 'string' ? el.className.split(/\\s+/)[0] : null,
+      }
+    }
+    return {
+      inRoot: inRoot ? inRoot.contains(panel) : null,
+      portaled: document.querySelectorAll('[data-fa-portaled]').length,
+      escaped,
+      closeHit,
+      togglePE: toggles[0] ? getComputedStyle(toggles[0]).pointerEvents : 'none-present',
+    }
+  })()`)
+  console.log('   ', JSON.stringify(dfix))
+  check('desktop: inspector still inside the React root', dfix !== null && dfix.inRoot === true, String(dfix && dfix.inRoot))
+  check('desktop: nothing is portaled', dfix !== null && dfix.portaled === 0, String(dfix && dfix.portaled))
+  check('desktop: no control escaped the panel box', dfix !== null && dfix.escaped === 0, String(dfix && dfix.escaped))
+  check('desktop: the shadowing control keeps its own pointer behaviour', dfix !== null && (dfix.togglePE === null || dfix.togglePE === 'none-present' || dfix.togglePE !== 'none'), dfix ? String(dfix.togglePE) : '—')
+  check('desktop: elementFromPoint at close reaches the close button', dfix !== null && dfix.closeHit !== null && dfix.closeHit.reached, dfix && dfix.closeHit ? `.${dfix.closeHit.cls}` : '—')
 
   await page.screenshot({ path: '/tmp/fa-traj-desktop.png' })
   await context.close()
