@@ -188,6 +188,39 @@ questions once it is up.
 - [ ] **npm published** — needs an npm account; the GitHub token cannot do it (see below)
 - [ ] `dsh plugin --profile web add dsh-frutiger-aero` verified on a clean profile (blocked on npm)
 - [ ] **Rotate the GitHub token** that was used for the push
+- [x] `v1.0.4` tagged and pushed — the tag carries the release notes, because
+      (see below) the token in use cannot create a Release object
+
+### Publishing a Release needs a token this repo does not have
+
+`v1.0.4` is tagged and pushed, and GitHub shows tag-only releases on the Releases
+page, but creating a full Release object returned:
+
+```text
+HTTP 403  Resource not accessible by personal access token
+```
+
+The token used for these pushes authenticates as **`aeroheaven1`**, not
+`Hotsteel2901`. It can push commits and tags — the push path is git-over-HTTP and
+only needs write access to the repository — but it has no `contents: write`
+scope, so anything on the REST API that writes is refused. The same applies to
+`git/refs`, so this is a scope limit rather than something specific to releases.
+
+Two ways out, either of which is a one-off:
+
+1. Create the Release in the web UI from the existing `v1.0.4` tag, pasting the
+   `## [1.0.4]` section of `CHANGELOG.md` as the body.
+2. Or mint a token with `contents: write` on `Hotsteel2901` and run:
+
+   ```sh
+   gh release create v1.0.4 --title "dsh-frutiger-aero 1.0.4" \
+     --notes-file <(sed -n '/^## \[1.0.4\]/,/^## \[1.1.0\]/p' CHANGELOG.md)
+   ```
+
+Worth knowing because of how it failed: while `releases/latest` still pointed at
+the *old* tag `1.0.3`, the installer kept working correctly anyway — it resolves
+the default branch, not the latest release. That was the whole point of moving it
+off `releases/latest`, and this was an unplanned demonstration of it.
 
 ### The two that need you
 
