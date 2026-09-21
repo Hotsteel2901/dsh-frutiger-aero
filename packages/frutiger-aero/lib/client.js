@@ -1887,7 +1887,7 @@ window.__ModuleLoader__.load({
 		 * property the installer relies on when it compares an installed copy
 		 * against the sources it is holding.
 		 */
-		const FA_BUILD = {"version":"1.1.0","fingerprint":"20bfbdb4cf57"};
+		const FA_BUILD = {"version":"1.0.4","fingerprint":"29a0a56d96af"};
 		exports.build = FA_BUILD;
 		exports.apply = apply;
 		exports.inject = inject;
