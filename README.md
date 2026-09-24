@@ -103,6 +103,11 @@ snapshot forever, and there was no way to tell. Pin a specific ref when you want
 curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
+Both installers fetch that ref fresh on every run, so **re-running the one-liner is how you move to
+the newest version** — nothing is cached, and there is no version number to bump by hand. Every
+install prints the version and build fingerprint it wrote, which is the answer to "am I on the
+latest?".
+
 ### From a clone (for development)
 
 ```sh
@@ -133,6 +138,25 @@ authenticated session cookie.
 | `--doctor` | inspect an existing install and print every problem with a fix for each — read-only |
 | `--repair` | re-copy the payload over an existing install, keeping the profile and its sessions |
 | `--json` | machine-readable result |
+
+The two installers accept the same settings through the environment, which is the only option
+available under `irm … | iex` — `Invoke-Expression` has no `-Args`, so there is nowhere to put a
+flag on that command line. `install.sh --help` prints the values a run would actually use.
+
+| variable | effect |
+| --- | --- |
+| `DSH_FRUTIGER_REPO` | `owner/repo` to fetch from (default `Hotsteel2901/dsh-frutiger-aero`) |
+| `DSH_FRUTIGER_REF` | tag or commit to pin (default: the default branch, resolved at install time) |
+| `DSH_FRUTIGER_PROFILE` | profile to create or update (default `frutiger`) |
+| `DSH_FRUTIGER_HOME` | Harness home to operate on (default `$DSH_HOME`, then `~/.dsh`) |
+
+```powershell
+$env:DSH_FRUTIGER_PROFILE = 'aero'
+irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex
+```
+
+The landing page picks the right one of these commands for your system, so there is normally no
+reason to type it by hand.
 
 ### If something looks wrong
 

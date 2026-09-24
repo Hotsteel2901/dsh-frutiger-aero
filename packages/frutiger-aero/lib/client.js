@@ -2020,7 +2020,7 @@ window.__ModuleLoader__.load({
 		  })
 
 		  installControlSurface(ctx, {
-		    version: '1.1.0',
+		    version: '1.1.1',
 		    tier: () => document.documentElement.dataset.faTier,
 		    setEffects(effects) {
 		      if (effects === 'off' || effects === 'lite' || effects === 'full') writePreference(FA_STORE_KEY, effects)
@@ -2088,7 +2088,7 @@ window.__ModuleLoader__.load({
 		 * property the installer relies on when it compares an installed copy
 		 * against the sources it is holding.
 		 */
-		const FA_BUILD = {"version":"1.1.0","fingerprint":"09c258c06546"};
+		const FA_BUILD = {"version":"1.1.1","fingerprint":"2e9173a987d0"};
 		exports.build = FA_BUILD;
 		exports.apply = apply;
 		exports.inject = inject;

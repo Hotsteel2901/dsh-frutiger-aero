@@ -742,6 +742,15 @@ html[data-scheme='dark'] .btn--primary {
   scrollbar-width: none;
 }
 
+/* The platform variants. `[hidden]` is a UA style and therefore a *low*
+   priority one: any later rule that sets `display` on `.cmd code` would silently
+   reveal the command that does not belong to this machine, and the reader would
+   copy a command that cannot run. Stating it here makes the intent explicit
+   rather than relying on the UA sheet winning a specificity fight it would lose. */
+.cmd code[hidden] {
+  display: none;
+}
+
 .cmd code::-webkit-scrollbar {
   display: none;
 }

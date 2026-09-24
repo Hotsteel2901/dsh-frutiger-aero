@@ -1,8 +1,9 @@
 # dsh-frutiger-aero — GitHub installer for Windows.
 #
 #   irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex
-#   $env:DSH_FRUTIGER_PROFILE = 'aero'; irm ... | iex
-#   irm ... | iex -Args '-Ref','main'          # pin a specific ref
+#   $env:DSH_FRUTIGER_PROFILE = 'aero'; irm ... | iex        # pick a profile
+#   $env:DSH_FRUTIGER_REF = 'v1.1.0';   irm ... | iex        # pin a tag or commit
+#   .\install.ps1 -Ref main -Profile aero                    # when run as a file
 #
 # Needs nothing but Node and PowerShell 5.1+. No package manager, no registry
 # account, no git, no build. It downloads a snapshot of this repository and
@@ -13,18 +14,62 @@
 # spelled out in install.sh: a release tag and the branch it was cut from both
 # announce `version: 1.1.0` while holding different code, so a tag-based default
 # made "did I get anything new?" unanswerable and made reinstalling a no-op.
-# `-Ref` pins a tag or commit when that is what you want.
-
-[CmdletBinding()]
-param(
-  [string]$Profile = $(if ($env:DSH_FRUTIGER_PROFILE) { $env:DSH_FRUTIGER_PROFILE } else { 'frutiger' }),
-  [string]$Home,
-  [string]$Ref,
-  [string]$Repo = $(if ($env:DSH_FRUTIGER_REPO) { $env:DSH_FRUTIGER_REPO } else { 'Hotsteel2901/dsh-frutiger-aero' })
-)
+# `-Ref` pins a tag or commit when that is what you want. The version and build
+# fingerprint actually installed are printed at the end, so "am I on the latest"
+# has an answer.
+#
+# ## Why there is no `param()` block, and why that is not a style choice
+#
+# This script is normally run as `irm ... | iex`, and in that path a `param()`
+# block does **not** behave the way it reads:
+#
+#   1. **`[string]$Home` collides with the read-only automatic `$HOME`.** Which
+#      PowerShell variables are case-insensitive means `$Home` and `$HOME` are
+#      the same variable, so evaluating the block throws
+#      `Cannot overwrite variable HOME because it is read-only or constant` —
+#      and the install dies before its first line of real work.
+#   2. **Parameter defaults are not applied.** The `$(if ($env:...) ...)`
+#      defaults below never took effect under `Invoke-Expression`, so a user who
+#      set `DSH_FRUTIGER_PROFILE` got the default profile silently. A wrong
+#      answer that looks like a working install is worse than an error.
+#
+# Both were measured on PowerShell 7.4.6, not assumed: with the environment
+# variable set, the `param()` version still reported `profile=frutiger`, and
+# removing the block made it report `profile=aero`.
+#
+# So the parameters are read in the body, with the precedence
+# `explicit argument -> environment variable -> default`, and the whole file
+# behaves identically whether it is piped into `iex` or run as `.\install.ps1`.
+# (`iex -Args` does not exist — `Invoke-Expression` has no `-Args` parameter —
+# which is why the environment variable is the documented way to pass values.)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+
+# Explicit arguments win, but they are only present when this file is run as a
+# script. Under `irm | iex` they are empty and the environment decides.
+$argProfile = $null
+$argRef = $null
+$argHome = $null
+$argRepo = $null
+for ($i = 0; $i -lt $args.Count; $i++) {
+  switch ($args[$i]) {
+    '--profile' { $argProfile = $args[$i + 1]; $i++ }
+    '-Profile'  { $argProfile = $args[$i + 1]; $i++ }
+    '--ref'     { $argRef = $args[$i + 1]; $i++ }
+    '-Ref'      { $argRef = $args[$i + 1]; $i++ }
+    '--home'    { $argHome = $args[$i + 1]; $i++ }
+    '-Home'     { $argHome = $args[$i + 1]; $i++ }
+    '--repo'    { $argRepo = $args[$i + 1]; $i++ }
+    '-Repo'     { $argRepo = $args[$i + 1]; $i++ }
+  }
+}
+
+# `$HomeDir`, never `$Home`: see the note above about the read-only `$HOME`.
+$Profile = if ($argProfile) { $argProfile } elseif ($env:DSH_FRUTIGER_PROFILE) { $env:DSH_FRUTIGER_PROFILE } else { 'frutiger' }
+$Ref = if ($argRef) { $argRef } elseif ($env:DSH_FRUTIGER_REF) { $env:DSH_FRUTIGER_REF } else { $null }
+$HomeDir = if ($argHome) { $argHome } elseif ($env:DSH_FRUTIGER_HOME) { $env:DSH_FRUTIGER_HOME } else { $null }
+$Repo = if ($argRepo) { $argRepo } elseif ($env:DSH_FRUTIGER_REPO) { $env:DSH_FRUTIGER_REPO } else { 'Hotsteel2901/dsh-frutiger-aero' }
 
 function Fail($message) { Write-Error "dsh-frutiger-aero: $message"; exit 1 }
 
@@ -78,19 +123,18 @@ try {
   if (-not (Test-Path $installer)) { Fail 'the archive does not look like dsh-frutiger-aero' }
 
   $arguments = @($installer, '--profile', $Profile)
-  if ($Home) { $arguments += @('--home', $Home) }
+  if ($HomeDir) { $arguments += @('--home', $HomeDir) }
   & node @arguments
   if ($LASTEXITCODE -ne 0) { Fail 'the installer reported a failure' }
 } finally {
   Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue
 }
 
+# One line naming the source, then stop. `install.mjs` has already printed the
+# version, the build fingerprint, where it landed and how to start it — the
+# identity that answers "am I on the latest?" — so repeating any of it here
+# would only give the reader two summaries to reconcile. What this script alone
+# knows is *which ref it fetched*, and that is the one thing worth adding.
 Write-Host ''
-Write-Host 'If the skin ever looks wrong, ask what is installed instead of reinstalling -'
-Write-Host 'the answer names the problem, and no step it prints asks you to start over:'
-Write-Host "  node install.mjs --profile $Profile --doctor"
-Write-Host ''
-Write-Host 'Start it with:'
-Write-Host "  dsh --profile $Profile --port 3099 --no-open"
-Write-Host ''
-Write-Host 'then open the URL that command prints (it carries the one-time token).'
+Write-Host "dsh-frutiger-aero: installed from $Repo@$Ref"
+Write-Host 'the version and build fingerprint above are what is installed now.'

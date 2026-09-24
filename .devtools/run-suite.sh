@@ -11,7 +11,7 @@
 # (`devtools/serve.sh`) and takes its token URL.
 #
 # usage: run-suite.sh [url]
-#        devtools/run-suite.sh "$(grep -o 'http.*' /tmp/fa-x.log | tail -1)"
+#        devtools/run-suite.sh "$(grep -oE 'http://[^ ]*token=[A-Za-z0-9_-]+' /tmp/fa-x.log | tail -1)"
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -52,7 +52,14 @@ export PATH
 
 if [ -z "$URL" ]; then
   # Fall back to the most recent token URL this sandbox printed.
-  URL="$(grep -o 'http://[^ ]*token=[A-Za-z0-9]*' /tmp/fa-x.log 2>/dev/null | tail -1)"
+  #
+  # `[A-Za-z0-9]` is the *wrong* character class and was here before: the token
+  # is base64url, so it contains `-` and `_`, and the old pattern stopped at the
+  # first one. A truncated token does not look wrong — it produces a 401 from
+  # every probe, so the whole suite goes red on a healthy build and the failure
+  # points at the code instead of at this line. Measured: `token=Otj` captured
+  # where the server issued `token=Otj_4k3S9uPzKHLbNG-U-rABjELGFj1uSJH-Ck5SUnc`.
+  URL="$(grep -oE 'http://[^ ]*token=[A-Za-z0-9_-]+' /tmp/fa-x.log 2>/dev/null | tail -1)"
 fi
 if [ -z "$URL" ]; then
   echo "no url: pass one, or start the harness with devtools/serve.sh" >&2
@@ -181,6 +188,13 @@ run "landing page still works" bash -c \
   "URL=\$(bash '$HERE/landing-site.sh' start) && node '$HERE/landing.mjs' \"\$URL\"; code=\$?; bash '$HERE/landing-site.sh' stop; exit \$code"
 run "landing page motion layer" bash -c \
   "URL=\$(bash '$HERE/landing-site.sh' start) && node '$HERE/landingfx.mjs' \"\$URL\"; code=\$?; bash '$HERE/landing-site.sh' stop; exit \$code"
+# Which one-liner the page hands you, run once per spoofed platform. This is the
+# only check here whose correct answer *differs per machine*, so it cannot be
+# folded into `landing.mjs`, which has one answer to assert. The failure it
+# guards is invisible: a copy button that copies the hidden command, or a page
+# that shows the Unix one-liner to a Windows reader.
+run "landing page picks the right installer" bash -c \
+  "URL=\$(bash '$HERE/landing-site.sh' start) && node '$HERE/landing-install.mjs' \"\$URL\"; code=\$?; bash '$HERE/landing-site.sh' stop; exit \$code"
 
 echo "── resources ─────────────────────────────────────────────────────"
 run "no unexpected 4xx/5xx" node "$HERE/netcheck.mjs" "$URL"

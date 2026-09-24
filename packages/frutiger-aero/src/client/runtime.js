@@ -1115,7 +1115,7 @@ function apply(ctx) {
   })
 
   installControlSurface(ctx, {
-    version: '1.1.0',
+    version: '1.1.1',
     tier: () => document.documentElement.dataset.faTier,
     setEffects(effects) {
       if (effects === 'off' || effects === 'lite' || effects === 'full') writePreference(FA_STORE_KEY, effects)

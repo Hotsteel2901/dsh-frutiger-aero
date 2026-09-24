@@ -4,6 +4,104 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-09-24
+
+The install path on Windows: three defects in one construct, of which only the
+first announced itself, plus a landing page that no longer assumes everyone is
+on Linux.
+
+### Fixed
+
+- **`install.ps1` died on its first statement.** The reported error was
+
+  ```text
+  Invoke-Expression: 无法覆盖变量 HOME，因为它是只读变量或常量。
+  ```
+
+  reproduced here on PowerShell 7.4.6, and the cause is that PowerShell variable
+  names are **case-insensitive**: declaring `param([string]$Home)` is not a new
+  parameter, it is an attempt to overwrite the automatic read-only `$HOME`.
+
+  Renaming that one parameter would have been the whole fix if the error had been
+  the whole problem. It was not — the `param()` block carried two more defects
+  that never printed anything:
+
+- **The environment variables were silently ignored under `irm … | iex`.**
+  `param()` defaults are not applied when the script text is piped into
+  `Invoke-Expression`, so `$env:DSH_FRUTIGER_PROFILE = 'aero'` produced a
+  `frutiger` install and reported success. Measured both ways: with the block the
+  script reported `profile=frutiger`, without it `profile=aero`. A wrong answer
+  that looks like a working install is worse than a crash, and this is the reason
+  the fix removes the `param()` block instead of renaming inside it.
+
+- **The header documented `iex -Args '-Ref','main'`, which does not exist.**
+  `Invoke-Expression` has no `-Args` parameter, so the one documented way to pass
+  a ref was unusable — and under `iex` there is no command line to put a flag on
+  at all. The environment is now the documented route:
+
+  ```powershell
+  $env:DSH_FRUTIGER_REF = 'v1.1.1'; irm …/install.ps1 | iex
+  ```
+
+- **`install.sh` ignored `DSH_FRUTIGER_PROFILE` entirely** (hardcoded to
+  `frutiger`) and used `DSH_HOME` where the PowerShell script used
+  `DSH_FRUTIGER_HOME`. The two scripts now read one shared vocabulary —
+  `DSH_FRUTIGER_REPO`, `DSH_FRUTIGER_REF`, `DSH_FRUTIGER_PROFILE`,
+  `DSH_FRUTIGER_HOME` — with `DSH_HOME` kept as a fallback because `dsh` itself
+  defines it.
+
+- **`install.sh --help` died with `say: not found`.** The helper it calls was
+  defined *after* the argument loop, and `--help` returns from inside that loop;
+  a shell function used before its definition is a runtime error, not a parse
+  error, so `sh -n` never caught it. Both helpers now precede the loop.
+
+### Added
+
+- **`install.sh --help` prints the values a run would actually use.** The header
+  documents variable *names*; only this shows they were read. It is also what
+  makes the naming agreement with `install.ps1` testable without running a whole
+  install.
+
+- **The landing page detects the platform and hands over the matching command.**
+  It used to show every visitor the Unix one-liner and mention `install.ps1` in
+  prose, as something to go and find — a dead end, and not merely cosmetic:
+  there is no `sh` on Windows, so the command on screen could not run. Both
+  variants now live in the markup and one is chosen, following the same rule the
+  language switch already used; with JavaScript disabled the Unix form remains,
+  so the block is never empty.
+
+  The copy button names its target by id, so switching the visible element
+  rewrites `data-copy` too. That edge is the one failure of this feature a reader
+  cannot see — screen and clipboard disagreeing, and only the clipboard being
+  wrong.
+
+- **`.devtools/landing-install.mjs`**, which runs the page under three spoofed
+  user agents and asserts, per command block: exactly one variant visible, the
+  correct one for that platform, no copy button pointing at a hidden element, and
+  that the clipboard matches the screen. Plus a `javaScriptEnabled: false` pass.
+  Sabotaging `detectOS()` to answer `'unix'` for Windows turns it red on three
+  checks — the reported bug reproduced as a test.
+
+- **`installcheck.mjs` now parses `install.ps1`** (with the real PowerShell
+  parser, not a regex) and **fails if any `param()` name shadows an automatic
+  variable**, which is the whole family the `$Home` crash belongs to. It also
+  asserts that both installers read the same four environment variables and that
+  `DSH_FRUTIGER_PROFILE` really changes what gets installed.
+
+### Changed
+
+- **`install.sh` and `install.ps1` print one closing line instead of reprinting
+  the summary.** `install.mjs` already prints the version, the build fingerprint,
+  where it landed and how to start it; the wrappers were duplicating all of it,
+  which gave the reader two summaries to reconcile. They now add only what they
+  alone know — which ref they fetched.
+
+- **The landing page no longer says "On Windows, use `install.ps1` from the
+  repository instead."** It says the command above was chosen for your system.
+  The development one-liner (`git clone … && node install.mjs`) is deliberately
+  *not* split by platform, because `&&` has worked in PowerShell since 7.0 and
+  that line genuinely is the same on both.
+
 ## [1.1.0] — 2026-09-24
 
 The desktop pass: a large amount of animation, held inside a measured budget,

@@ -117,7 +117,21 @@
             </p>
 
             <div class="cmd">
-              <code id="cmd-install">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+              <!--
+                Both platform commands are in the markup and one is chosen by the
+                script below, following the same rule the rest of this page
+                uses for language: write every variant into the document, then
+                switch which one is shown. That keeps the command readable with
+                JavaScript disabled — the Linux one is the default — instead of
+                leaving an empty box.
+
+                The Windows command is not a translation of the Unix one: there
+                is no `sh` there, so it is a different program with a different
+                invocation, and telling a Windows reader to "use install.ps1 from
+                the repository" was a dead end rather than an instruction.
+              -->
+              <code id="cmd-install" data-install-cmd="unix">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+              <code id="cmd-install-win" data-install-cmd="windows" hidden>irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex</code>
               <button class="btn cmd__copy" type="button" data-copy="cmd-install" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>
                   <span class="cmd__label" data-lang-block="zh">复制</span>
@@ -476,7 +490,8 @@
                 <span class="tag" data-lang-block="zh">推荐</span>
               </h3>
               <div class="cmd">
-                <code id="cmd-1">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+                <code id="cmd-1" data-install-cmd="unix">curl -fsSL https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.sh | sh</code>
+                <code id="cmd-1-win" data-install-cmd="windows" hidden>irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex</code>
                 <button class="btn cmd__copy" type="button" data-copy="cmd-1" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>
                   <span class="cmd__label" data-lang-block="zh">复制</span>
@@ -486,12 +501,14 @@
               </div>
               <p data-lang-block="en">
                 Downloads the repository and installs it into a profile — no package manager, no
-                registry, no build step. Needs <strong>Node 24 or newer</strong>. On Windows, use
-                <code>install.ps1</code> from the repository instead.
+                registry, no build step. Needs <strong>Node 24 or newer</strong>. The command above
+                is chosen for your system; on Windows it is the PowerShell installer, in macOS and
+                Linux the shell one.
               </p>
               <p data-lang-block="zh">
                 下载仓库并装进 profile —— 不需要包管理器、不需要 registry、也不需要构建。
-                需要 <strong>Node 24 或更新版本</strong>。Windows 请改用仓库里的 <code>install.ps1</code>。
+                需要 <strong>Node 24 或更新版本</strong>。上面的命令已按你的系统自动选择：
+                Windows 下是 PowerShell 安装脚本，macOS 和 Linux 下是 shell 脚本。
               </p>
             </div>
 
@@ -503,6 +520,10 @@
                 <span class="tag" data-lang-block="zh">开发用</span>
               </h3>
               <div class="cmd">
+                <!-- Deliberately *not* split by platform. `&&` has worked in
+                     PowerShell since 7.0 and `;` would too, so this one line is
+                     genuinely the same on both — unlike the installer above,
+                     which is a different program per platform. -->
                 <code id="cmd-2">git clone https://github.com/Hotsteel2901/dsh-frutiger-aero &amp;&amp; cd dsh-frutiger-aero &amp;&amp; node install.mjs</code>
                 <button class="btn cmd__copy" type="button" data-copy="cmd-2" aria-label="Copy the install command">
                   <span class="cmd__label" data-lang-block="en">Copy</span>

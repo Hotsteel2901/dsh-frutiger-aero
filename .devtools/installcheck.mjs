@@ -133,6 +133,75 @@ async function main() {
     check('install.sh parses as POSIX sh', false, 'sh -n reported a syntax error')
   }
 
+  // ── 1b. install.ps1 parses, and its parameter names cannot shadow automatic
+  //        variables ────────────────────────────────────────────────────────
+  //   Windows had no equivalent of the line above, and that gap shipped a script
+  //   that died on its first statement:
+  //
+  //     Invoke-Expression: Cannot overwrite variable HOME because it is
+  //     read-only or constant.
+  //
+  //   `param([string]$Home)` cannot be declared at all, because PowerShell
+  //   variable names are case-insensitive and `$Home` *is* the automatic
+  //   read-only `$HOME`. The class of mistake is broader than that one name, so
+  //   the check rejects the whole family — any parameter whose name collides
+  //   case-insensitively with an automatic variable — rather than the single
+  //   spelling that happened to be reported.
+  //
+  //   It runs without PowerShell when the machine has none, using a textual
+  //   parse that covers this file's actual shape and says so; with `pwsh`
+  //   present it asks the real parser instead, which is the only version of the
+  //   answer worth having.
+  const ps1Path = join(REPO, 'install.ps1')
+  const ps1Text = readFileSync(ps1Path, 'utf8')
+  // Comments in this file *discuss* `$Home` at length, and those mentions must
+  // not trip the check, so they are stripped first.
+  const ps1Code = ps1Text
+    .replace(/<#[\s\S]*?#>/g, '')
+    .split('\n')
+    .filter((line) => !/^\s*#/.test(line))
+    .join('\n')
+  // The automatic variables a `param()` block must never try to redeclare.
+  const AUTOMATIC = ['HOME', 'PWD', 'PID', 'HOST', 'PSHOME', 'PSCULTURE', 'PSVERSION', 'PROFILE',
+    'ARGS', 'INPUT', 'MATCHES', 'ERROR', 'TRUE', 'FALSE', 'NULL', 'LASTEXITCODE', 'MYINVOCATION',
+    'PSCOMMANDPATH', 'PSScriptRoot', 'PSEdition', 'ShellId', 'StackTrace', 'THIS', '_']
+  const paramBlocks = [...ps1Code.matchAll(/\bparam\s*\(([\s\S]*?)\)\s*(?:\r?\n|$)/g)].map((m) => m[1])
+  const declared = paramBlocks.join('\n')
+  const shadowed = AUTOMATIC.filter((name) =>
+    new RegExp(`\\$\\{?${name}\\b`, 'i').test(declared))
+  const pwsh = ['pwsh', '/usr/bin/pwsh', '/opt/microsoft/powershell/7/pwsh', '/opt/pwsh/pwsh']
+    .find((candidate) => existsSync(candidate))
+  // A textual parse can only see names this file actually declares; say which
+  // route produced the verdict so a weak pass is not mistaken for a strong one.
+  const parseRoute = pwsh ? pwsh : 'textual'
+  if (shadowed.length > 0) {
+    check('install.ps1 declares no parameter that shadows an automatic variable', false,
+      `param(${shadowed.join(', $')}) — PowerShell names are case-insensitive, so this throws on load`)
+  } else if (pwsh) {
+    // Parse without executing, which is what is needed: running the file would
+    // reach for the network. The error collection must be a *variable* passed by
+    // `[ref]` — `ParseFile(..., [ref]$null, [ref]$errs)` fails with
+    // "[ref] cannot be applied to a variable that does not exist", so `$errs` is
+    // declared first. Verified against a deliberately broken file: the same
+    // snippet exits 1 and prints the parser's message.
+    const script =
+      `$errs = $null; ` +
+      `$null = [System.Management.Automation.Language.Parser]::ParseFile(` +
+      `'${ps1Path.replace(/'/g, "''")}', [ref]$null, [ref]$errs); ` +
+      `if ($errs.Count) { $errs | ForEach-Object { $_.Message }; exit 1 } else { exit 0 }`
+    const parsed = sh(pwsh, ['-NoProfile', '-NonInteractive', '-Command', script])
+    check('install.ps1 parses as PowerShell', parsed.code === 0,
+      `pwsh ${(sh(pwsh, ['-NoProfile', '-Command', '$PSVersionTable.PSVersion.ToString()']).out || '').trim()} said: ` +
+        `${(parsed.out + parsed.err).trim().slice(0, 200)}`)
+  } else {
+    // No `pwsh` here. Assert the things that can be checked textually and be
+    // explicit that the real parser was not consulted.
+    const noParam = paramBlocks.length === 0
+    const readsArgs = /\$args/.test(ps1Code)
+    check('install.ps1 parses as PowerShell', noParam && readsArgs,
+      `no PowerShell on this machine (${parseRoute} route): param() blocks=${paramBlocks.length}, reads $args=${readsArgs}`)
+  }
+
   // ── 2. help is complete and self-maintaining ────────────────────────────
   //   The help slices the header comment, so it can silently truncate when the
   //   header grows. Anchor on content rather than on line count.
@@ -160,6 +229,37 @@ async function main() {
     check('install.sh refuses Node 22 with an actionable message', true,
       'Node 22 is not installed here, so the refusal path cannot be exercised', { skipped: true })
   }
+
+  // ── 3b. the two installers honour the same environment variables ────────
+  //   `install.sh` and `install.ps1` are one product with two entry points, so a
+  //   reader who checks the page on a laptop and installs on a desktop should
+  //   not have to learn two sets of names. They used to disagree: the shell
+  //   script honoured `DSH_HOME` while the PowerShell one used
+  //   `DSH_FRUTIGER_HOME`, and `DSH_FRUTIGER_PROFILE` was read by the PowerShell
+  //   script and hardcoded in the shell one.
+  //
+  //   This asserts the *shared* vocabulary directly, from the scripts' text,
+  //   which is the only place the contract exists. Reaching for the network to
+  //   exercise it end to end would make the check unavailable offline, and the
+  //   behaviour it guards is a naming agreement.
+  const shText = readFileSync(join(REPO, 'install.sh'), 'utf8')
+  const SHARED = ['DSH_FRUTIGER_REPO', 'DSH_FRUTIGER_REF', 'DSH_FRUTIGER_PROFILE', 'DSH_FRUTIGER_HOME']
+  const missingSh = SHARED.filter((name) => !shText.includes(name))
+  const missingPs = SHARED.filter((name) => !ps1Text.includes(name))
+  check('both installers read the same environment variables',
+    missingSh.length === 0 && missingPs.length === 0,
+    `install.sh missing ${JSON.stringify(missingSh)}; install.ps1 missing ${JSON.stringify(missingPs)}`)
+
+  //   And the variable actually drives the value, rather than merely appearing
+  //   in a comment. `--help` prints the resolved profile, which is the one
+  //   observable path that needs no install and no network.
+  const envProfile = sh('sh', [join(REPO, 'install.sh'), '--help'], {
+    env: { ...process.env, DSH_FRUTIGER_PROFILE: 'envprobe' },
+  })
+  check('DSH_FRUTIGER_PROFILE really changes what install.sh installs',
+    /envprobe/.test(envProfile.out + envProfile.err),
+    `install.sh --help with DSH_FRUTIGER_PROFILE=envprobe did not mention the value: ` +
+      `${JSON.stringify((envProfile.out + envProfile.err).slice(0, 160))}`)
 
   // ── 4. install.mjs is idempotent and never deletes the profile ──────────
   //   The literal answer to "安装失败还得全删掉再重新安装": prove that a second

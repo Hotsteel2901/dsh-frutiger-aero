@@ -195,7 +195,70 @@
     ).observe(sentinel)
   }
 
-  /* ── 7. Copy buttons ──────────────────────────────────────────────────────
+  /* ── 7. The install one-liner for this machine ───────────────────────────
+     The page used to hand every visitor the Unix one-liner and mention, in
+     prose, that Windows users should go and find `install.ps1` themselves. That
+     is not an instruction, it is a dead end — and the reason the Unix one-liner
+     is wrong on Windows is not cosmetic: there is no `sh` to pipe it into.
+
+     Both one-liners live in the markup and this picks one, the same way the
+     language switch already works. The default in the HTML is the Unix form, so
+     with JavaScript disabled a reader still gets something runnable rather than
+     an empty box. */
+
+  function detectOS() {
+    // `userAgentData.platform` is the modern, non-deprecated signal. Everything
+    // else here is a fallback: `navigator.platform` is deprecated but still
+    // populated, and the UA string is the last resort for older engines.
+    var platform = ''
+    try {
+      if (navigator.userAgentData && navigator.userAgentData.platform) {
+        platform = navigator.userAgentData.platform
+      }
+    } catch (error) {
+      /* a locked-down browser may throw on the getter */
+    }
+    if (!platform) platform = navigator.platform || ''
+    var haystack = platform + ' ' + (navigator.userAgent || '')
+
+    if (/win/i.test(haystack)) return 'windows'
+    // macOS, iOS, Linux, Android, ChromeOS and anything unrecognised all run the
+    // Unix one-liner, which is also the markup default — so an unknown platform
+    // never disagrees with the no-JS answer.
+    return 'unix'
+  }
+
+  /**
+   * Show the one-liner matching `os` and point every copy button in the same
+   * block at whichever element ended up visible.
+   *
+   * Each `.cmd` block holds one element per platform plus its copy button, and
+   * the button names its target by id. Moving the target therefore means
+   * rewriting the button's `data-copy` too — otherwise the button keeps copying
+   * the hidden one-liner, which is the one failure of this feature a reader
+   * cannot see for themselves: what is on screen and what lands on the clipboard
+   * disagree, and only the clipboard is wrong.
+   */
+  function initInstallCommand() {
+    var os = detectOS()
+    var blocks = document.querySelectorAll('.cmd')
+    for (var i = 0; i < blocks.length; i++) {
+      var variants = blocks[i].querySelectorAll('[data-install-cmd]')
+      if (variants.length === 0) continue
+      var chosen = null
+      for (var j = 0; j < variants.length; j++) {
+        var show = variants[j].dataset.installCmd === os
+        variants[j].hidden = !show
+        if (show) chosen = variants[j]
+      }
+      if (!chosen) continue
+      var button = blocks[i].querySelector('[data-copy]')
+      if (button) button.dataset.copy = chosen.id
+    }
+    return os
+  }
+
+  /* ── 8. Copy buttons ──────────────────────────────────────────────────────
      `navigator.clipboard` needs a secure context; the fallback selects the text
      so a `file://` preview still works. */
 
@@ -294,12 +357,26 @@
     buildBubbles()
     initObservers()
     initHeader()
+    // Before `initCopy()`, because that one reads `data-copy` when a click
+    // happens — and this is what decides which element that id names.
+    var os = initInstallCommand()
     initCopy()
     initParallax()
     initIdle()
 
     // Expose the tier so the page can be checked from a console or a test.
-    window.__LANDING__ = { tier: tier, lang: function () { return root.getAttribute('data-lang') } }
+    window.__LANDING__ = {
+      tier: tier,
+      lang: function () { return root.getAttribute('data-lang') },
+      // Which one-liner was chosen, and what the copy button would copy — the
+      // two facts a probe has to agree on, since a mismatch between them is
+      // invisible to a reader.
+      os: function () { return os },
+      installCommand: function () {
+        var shown = document.querySelector('[data-install-cmd]:not([hidden])')
+        return shown ? shown.textContent.trim() : null
+      },
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot)

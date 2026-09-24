@@ -33,14 +33,28 @@
 # something does look wrong, the answer is to ask what is installed rather than
 # to reinstall — see the `--doctor` hint printed at the end.
 #
-# Environment: DSH_FRUTIGER_REPO (owner/repo), DSH_FRUTIGER_REF, DSH_HOME.
+# Environment: DSH_FRUTIGER_REPO (owner/repo), DSH_FRUTIGER_REF,
+#              DSH_FRUTIGER_PROFILE, DSH_FRUTIGER_HOME.
+#
+# The variable names match `install.ps1` on purpose. A user who reads the page on
+# one machine and installs on another should not have to learn a second set, and
+# the two scripts previously disagreed: this one honoured `DSH_HOME` while the
+# PowerShell one used `DSH_FRUTIGER_HOME`, and neither read the other's profile
+# variable. `DSH_HOME` is still accepted because `dsh` itself defines it.
 
 set -eu
 
 REPO="${DSH_FRUTIGER_REPO:-Hotsteel2901/dsh-frutiger-aero}"
-PROFILE="frutiger"
-HOME_ARG=""
+PROFILE="${DSH_FRUTIGER_PROFILE:-frutiger}"
+HOME_ARG="${DSH_FRUTIGER_HOME:-${DSH_HOME:-}}"
 REF="${DSH_FRUTIGER_REF:-}"
+
+# Defined before the argument loop, not after it: `--help` returns from inside
+# that loop and needs both of these, and a function called before its definition
+# is a runtime error rather than a parse error — so the mistake would have shown
+# up only on the help path, which is the path a confused user takes.
+say() { printf '%s\n' "$*"; }
+die() { printf 'dsh-frutiger-aero: %s\n' "$*" >&2; exit 1; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -52,16 +66,24 @@ while [ $# -gt 0 ]; do
       # non-comment line so the range cannot drift out of date when the header
       # above grows. `sed` from 2 to the blank line before `set -eu`.
       sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
+      # Then the values this run would actually use. The header documents the
+      # variable *names*; this is the only place that shows they were read —
+      # a script can mention `DSH_FRUTIGER_PROFILE` in a comment forever while
+      # its body hardcodes `frutiger`, which is exactly what this one did. It is
+      # also what makes the naming agreement with `install.ps1` testable without
+      # running a whole install.
+      say ""
+      say "Values this run would use:"
+      say "  repo    $REPO"
+      say "  profile $PROFILE"
+      say "  ref     ${REF:-(the default branch, resolved at install time)}"
+      say "  home    ${HOME_ARG:-(the value \`dsh\` itself resolves)}"
       exit 0 ;;
     *) echo "dsh-frutiger-aero: unknown argument $1" >&2; exit 2 ;;
   esac
 done
 
-say() { printf '%s\n' "$*"; }
-die() { printf 'dsh-frutiger-aero: %s\n' "$*" >&2; exit 1; }
-
 command -v node >/dev/null 2>&1 || die "Node is required but was not found on PATH"
-
 # Check the major version, not merely that Node exists. `dsh` dispatches through
 # `if (import.meta.main)`, which is unimplemented before Node 24: on 20 or 22
 # that check is falsy, so the CLI prints nothing at all and exits 0. A user on 22
@@ -111,12 +133,11 @@ else
   node "$TMP/src/install.mjs" --profile "$PROFILE"
 fi
 
+# One line naming the source, then stop. `install.mjs` has already printed the
+# version, the build fingerprint, where it landed and how to start it — the
+# identity that answers "am I on the latest?" — so repeating any of it here
+# would only give the reader two summaries to reconcile. What this script alone
+# knows is *which ref it fetched*, and that is the one thing worth adding.
 say ""
-say "If the skin ever looks wrong, ask what is installed instead of reinstalling —"
-say "the answer names the problem, and no step it prints asks you to start over:"
-say "  node install.mjs --profile $PROFILE --doctor"
-say ""
-say "Start it with:"
-say "  dsh --profile $PROFILE --port 3099 --no-open"
-say ""
-say "then open the URL that command prints (it carries the one-time token)."
+say "dsh-frutiger-aero: installed from $REPO@$REF"
+say "the version and build fingerprint above are what is installed now."

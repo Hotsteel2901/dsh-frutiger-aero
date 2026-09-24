@@ -95,6 +95,10 @@ curl -fsSL .../install.sh | sh -s -- --profile aero
 curl -fsSL .../install.sh | sh -s -- --ref main
 ```
 
+两个安装脚本每次运行都会重新拉取该 ref，所以**想升级到最新版本，就是重新跑一遍那行命令** ——
+没有任何缓存，也没有需要手动改的版本号。每次安装都会打印本次写入的版本号和构建指纹，
+这就是"我装的是不是最新"的答案。
+
 ### 从克隆仓库安装（开发用）
 
 ```sh
@@ -124,6 +128,24 @@ dsh --profile frutiger --port 3099 --no-open
 | `--doctor` | 体检现有安装，逐条列出问题与对应修法 —— 只读，不写任何文件 |
 | `--repair` | 在原地重新拷贝一份，保留 profile 及其会话 |
 | `--json` | 输出机器可读结果 |
+
+两个安装脚本通过环境变量接受同一套设置 —— 在 `irm … | iex` 下这是唯一可行的入口，
+因为 `Invoke-Expression` 根本没有 `-Args` 参数，那条命令行上没地方放标志位。
+`install.sh --help` 会打印出本次运行实际会使用的取值。
+
+| 环境变量 | 作用 |
+| --- | --- |
+| `DSH_FRUTIGER_REPO` | 拉取的 `owner/repo`（默认 `Hotsteel2901/dsh-frutiger-aero`） |
+| `DSH_FRUTIGER_REF` | 固定到某个 tag 或 commit（默认：安装时解析出的默认分支） |
+| `DSH_FRUTIGER_PROFILE` | 要创建或更新的 profile（默认 `frutiger`） |
+| `DSH_FRUTIGER_HOME` | 操作的 Harness home（默认 `$DSH_HOME`，再退到 `~/.dsh`） |
+
+```powershell
+$env:DSH_FRUTIGER_PROFILE = 'aero'
+irm https://raw.githubusercontent.com/Hotsteel2901/dsh-frutiger-aero/main/install.ps1 | iex
+```
+
+落地页会按你的系统自动选好上面这两条命令中的一条，正常情况下不需要手打。
 
 ### 出问题了怎么办
 
