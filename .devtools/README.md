@@ -43,6 +43,16 @@ node landing.mjs http://127.0.0.1:8099/index.html # the GitHub Pages page
 | `bisect-styles.mjs <url>` | disables one of the plugin's stylesheets at a time, to attribute a rendering change |
 | `dpr.mjs <url>` | the same crop at 1x, 2x and 3x device pixel ratio |
 | `landing.mjs <url>` | the landing page: 19 checks across desktop, mobile and reduced motion |
+| `effects-manifest.mjs <url>` | what the desktop layer *is*: every effect per region, above a floor that has to be edited to be lowered |
+| `effects-tiers.mjs <url>` | whether `lite` and `off` actually stop what `full` starts: 54 checks, including "stopped" vs "hidden" |
+| `effects-parity.mjs <url>` | that `en` and `zh` render the *same* effects — declared motion **and** eight windows paused to four pinned phases and compared as rendered values |
+| `effects-perf.mjs <url>` | what the layer costs, per tier: layers, animated elements, compositable properties only, and long-task attribution against the `off` control |
+| `loopcheck.mjs <url>` | that every infinite loop can be stopped, and that stopping it does not hide the element |
+| `composercheck.mjs <url>` | the composer and the overlay layer with their surfaces open, where the effects only exist then |
+| `canvascheck.mjs <url>` | the canvas and the scroll-edge masks on a scrolled conversation |
+| `sidebarcheck.mjs <url>` | the sidebar's rows, rail and settings surface |
+| `headercheck.mjs <url>` | the header sheen, which needs a conversation to be rendered at all |
+| `DESKTOP-EFFECTS.md` | the reference for the above: the anchor vocabulary, the ten plausible `data-*` names that do not exist, the measured cost table, and the measurement traps |
 | `pass.mjs <url> <out> [tier]` | chat, settings dialog and menus as well as layout |
 | `cmp.mjs <baseline-url> <skin-url>` | the skin against a stock `web` profile, side by side |
 | `recon.mjs <url> <out>` | a DOM outline with boxes and attributes — the tool that produced the selector vocabulary |
@@ -92,7 +102,162 @@ owns the `overflow`. Then exclude what is *correctly* clipped — the `clip: rec
 reader pattern — by recognising the mechanism rather than a hashed class name, and check the whole
 ancestor chain, because one bundle nests a `display: contents` wrapper inside the clipped span.
 
-## The traps, and what each one cost
+## The harness profile needs a credential, or half the app is unreachable
+
+A profile with no API key boots into the product's own onboarding dialog, and that dialog's
+`OnboardingModal` does this for as long as it is mounted:
+
+```js
+const appRoot = document.getElementById('root')
+appRoot.inert = true
+```
+
+`inert` is inherited: **every** interactive node under `#root` becomes unfocusable and
+unclickable — the composer included. Nothing throws, nothing is `display: none`, and
+`getBoundingClientRect()` reports a perfectly healthy 774×116 card. The only symptom is that
+`element.focus()` leaves `document.activeElement` on `<body>`, and that
+`[data-composer-card]:focus-within` never matches, so every focus-keyed effect measures as absent
+and looks like a CSS bug.
+
+Seed the profile before running anything that depends on focus:
+
+```yaml
+# ${DSH_HOME}/settings.yaml — names the credential reference the route resolves
+llm-deepseek:
+  apiKeyEnv: DEEPSEEK_API_KEY
+```
+
+```yaml
+# ${DSH_HOME}/.credentials.yaml
+refs:                      # plain name → value; this is what `resolve`/`describe` read
+  DEEPSEEK_API_KEY: sk-any-placeholder
+records:                   # `<scope>/<id>` → tagged record; a different, structured namespace
+  DEEPSEEK_API_KEY: …      # WRONG — every record key must be "<scope>/<id>" or boot fails
+```
+
+Two things here are easy to get wrong and both fail loudly at boot rather than quietly:
+record keys must be `<scope>/<id>` (so `llm-pi-ai/deepseek-official`, never a bare env name), and
+the value the route resolves comes from `refs`, not from `records`. `composercheck.mjs` now
+asserts `inert: false` explicitly, so this state fails as itself instead of as four phantom
+"the effect does not work" failures.
+
+## The traps
+
+**A `bash` script whose stdout is captured cannot leave a child running.**
+`landing-site.sh start` launched its server as
+`( cd "$DOCS" && setsid python3 -m http.server … >"$LOG" 2>&1 </dev/null & )`.
+That looks detached, and `setsid` does detach the *session* — but the server
+stayed a live child of the script, so `bash` sat in `do_wait` for a process that
+by design never exits. The suite calls it as `URL=$(bash landing-site.sh start)`,
+a **command substitution**, so the script's stdout is a pipe: because the still-
+running server held the write end, `URL=$(…)` never saw EOF and blocked forever.
+`set -u` does not help, `timeout` inside the probe does not help, and the probe
+itself is innocent — it never got a chance to run.
+
+The signature, and it is worth memorising:
+
+```
+$ cat /proc/<wrapper>/wchan
+anon_pipe_read                      # the caller, blocked on the substitution
+$ cat /proc/<start-script>/wchan
+do_wait                             # this script, waiting for a child that never exits
+$ pgrep -P <start-script>
+417382 python3 -m http.server 8099  # the "detached" server, still parented here
+```
+
+Walking `/proc/*/fd` to find *who holds the pipe* is what settled it:
+
+```
+pid=419366 fd=3 -> pipe:[3488374278]   # bash -c, reading
+pid=419380 fd=1 -> pipe:[3488374278]   # landing-site.sh start, holding it open
+```
+
+The fix is to close all three descriptors at the subshell level
+(`( … & ) >/dev/null 2>&1 </dev/null`), which leaves nothing for the shell to
+wait on. `start` went from "hangs forever" to `0.309s`.
+
+This is the second stall of this shape in the project's history, and both cost
+hours. The general rule: **any backgrounded process started by a script whose
+output is captured must be reaped or fully detached — `&` alone is not
+detachment.**
+
+**`DSH_HOME` decides which profile the harness serves, and its absence is
+silent.** `deploy.sh` writes to `${DSH_HOME:-/tmp/fa-home}/profiles/frutiger/…`.
+If the launcher does not export `DSH_HOME`, `dsh` falls back to its default home
+(`/root/.dsh`), which holds a profile from whenever it was last created — and
+nothing in the loop updates it. The result is a browser loading an arbitrarily
+old build while every build and deploy step reports success.
+
+This cost most of a session and produced a wrong conclusion that looked
+well-evidenced: a probe reported `animationName: none` and no `fa-hero-lift` rule
+in any stylesheet, which reads as "the CSS is not reaching the page". It was
+true, and the cause was not the CSS. The tell was that the *built* bundle
+contained the keyframes and the *served* bundle did not:
+
+```
+$ grep -c fa-hero-lift packages/frutiger-aero/lib/client.js
+1
+$ md5sum /root/.dsh/profiles/frutiger/node_modules/dsh-frutiger-aero/lib/client.js
+97d262cbc3a3689d401db9fea339b647   # 176,631 bytes, dated Sep 20
+$ md5sum /tmp/fa-home/profiles/frutiger/node_modules/dsh-frutiger-aero/lib/client.js
+a8bf7f4d8a5dd15646374b47a3adb67b   # 283,273 bytes, the real build
+```
+
+The cheap standing check, which belongs beside the `?rev=` restart rule:
+
+```sh
+# what the browser is actually being handed
+curl -sL "http://127.0.0.1:7795/?$TOKEN" -o /tmp/page.html
+python3 -c "
+import re,html,urllib.request
+h=open('/tmp/page.html').read()
+u=html.unescape(re.search(r'(/plugins/\?\?[^\s\"<>]*frutiger[^\s\"<>]*)',h).group(1))
+d=urllib.request.urlopen('http://127.0.0.1:7795'+u,timeout=30).read().decode('utf8','replace')
+print('showcase rules:', d.count('fa-hero-lift'))"
+```
+
+If that prints `0` after a successful build, the harness is serving the wrong
+tree and no CSS conclusion you draw from the page is about your file.
+
+**A green light is only evidence if you have seen it go red.** `effects-perf.mjs`
+passed for three releases while measuring almost nothing about the file it was
+written for, and the tell was that its red-proof was *refused* — injecting a
+deliberately illegal animation changed no output. Three separate defects were
+stacked, each one a plausible way to write the scan:
+
+| what the probe did | why it saw nothing |
+| --- | --- |
+| `for (const rule of sheet.cssRules)` | `showcase.css` is one `@media` block: top level is 1 rule, the content is 44 deep |
+| `getComputedStyle(el).animationName` | a pseudo-element's animation is only reported by `getComputedStyle(el, '::before')`; five effects live there |
+| measured the hero only | the turn entrance, seat entrance, pulse and scroll-edge masks need a transcript, so they did not exist on the page |
+
+Before trusting a new assertion, break the thing it asserts and watch it fail. If
+that is hard, suspect the assertion.
+
+**An assertion that samples a running animation is a coin flip, not a check.**
+`composercheck.mjs` read the composer's focus ring at a fixed 700 ms and expected
+exactly `1`; it got `0.42`, `0.47` and `0.55` on three runs, because it was
+reading a 240 ms opacity transition mid-flight — the product auto-focuses at
+boot, so the transition had started at an unknown moment. The same file pinned
+one exact frame of a 7.4 s loop (`-1px` exactly, of a value that oscillates
+between `-1` and `-1.5`). Both are now written as ranges and as facts that do not
+depend on phase, and where a rendered value genuinely is the claim, the fix is to
+*pin the phase* through `document.getAnimations()` — which is what
+`effects-parity.mjs` does.
+
+**An animation at the animation origin beats a normal declaration.** Not "usually"
+— always, regardless of specificity and regardless of which stylesheet loaded
+last. The hero's `fa-hero-lift` therefore replaced the composer's `:focus-within`
+lift rather than adding to it, and because both produce *a* transform, the card
+still moved and still looked right. The fix is `animation-composition: add`, and
+the general rule is that any new `@keyframes` on a property the cascade also
+writes needs that composer to be checked deliberately.
+
+**A `transition-property` is not a transition.** It is the CSS initial value, so
+every element in the page reports `all`, and a large number report a real
+property at `transition-duration: 0s` — a declaration that exists and does
+nothing. Counting either produces phantom effects in every region. The usable
+test is declared **and** non-zero.
 
 **A mounted overlay is not a visible one.** The product keeps the right panel mounted while
 closed, slid off-screen with `visibility: hidden`, so its `getBoundingClientRect().height` stays

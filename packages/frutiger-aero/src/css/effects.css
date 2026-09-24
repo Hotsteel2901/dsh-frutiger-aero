@@ -22,6 +22,58 @@
  * elements. That is safe here specifically because the product defines no
  * pseudo-element on `button` at all — verified against its bundled CSS — so
  * there is nothing to displace.
+ *
+ * ## The desktop block
+ *
+ * From `@media (min-width: 1024px)` down to the end of the file, every rule is
+ * desktop-only. It is one block rather than a sixth stylesheet on purpose:
+ * `scripts/source-fingerprint.mjs` hashes a fixed list of source files into the
+ * build identity, and `runtime.js` inlines sheets in a fixed order, so a new
+ * file has to be registered in two places to ship at all. A media query is a
+ * cheaper thing to keep correct than a second registration list.
+ *
+ * Three measured facts shaped what is in here, all from `transitions.mjs` and
+ * `sidebarprobe3.mjs` against the live app:
+ *
+ *   - **Session rows already run `animation: YDXeBa_row-in .15s`.** The row is
+ *     therefore not available for an entrance of ours — a second `animation`
+ *     on the same element would replace the product's, not compose with it.
+ *     Rows get a hover *transition* instead, which is a different property
+ *     channel and cannot collide.
+ *   - **Session rows reserve `::before` *and* `::after` for the drag-drop
+ *     indicator** (`.dropBefore` / `.dropAfter`), which sets them to
+ *     `position: absolute` with `top: -7px` / `bottom: -7px`. Anything we
+ *     paint there would be a second writer on a slot the product fills during
+ *     a drag. The row's own children are the free surface.
+ *   - **The chevron is `display: none` until hover**, so it measures 0×0 at
+ *     rest. It is only ever visible inside a hover state, so its transition is
+ *     declared there too — an animation on an unrendered element is a rule
+ *     that never runs.
+ *
+ * ## The two regions this block deliberately does not touch
+ *
+ * "Leave no page untouched" is the brief; these are the two places where the
+ * honest answer is that the product already owns the motion, and adding ours
+ * would be a second writer on one property. Both were measured with
+ * `overlays.mjs` against the live app, not assumed.
+ *
+ *   - **The right panel** (`[data-sidebar-right-panel]`) already transitions
+ *     `transform, visibility` over 0.3s, and the whole panel slides by
+ *     `transform`. A second transform animation here would fight the slide it
+ *     already has: on open, whichever declaration wins, the other one is a
+ *     visible stutter. Its *contents* are covered instead — menus, listboxes
+ *     and rows inside it take the shared entrance, which is a different
+ *     element from the sliding container.
+ *   - **The dockkit surfaces** have no transition of their own at all. They
+ *     are also the mobile dock's furniture: `dockkit` is what the phone user
+ *     drags, and its measured hit targets are the 44px floor. An animated
+ *     surface under a dragged control is a moving target, so it stays put.
+ *     The phone half of this plugin is verified by `docktest.mjs`, which
+ *     asserts those targets; motion here would put the two in conflict.
+ *
+ * Neither omission is an oversight, and if the product later stops animating
+ * the right panel, the effect that belongs there should go in this block with
+ * the measurement that justified it.
  */
 
 /* ══ Floating surfaces: the Aero spring ═════════════════════════════════════
@@ -210,6 +262,589 @@
   }
 }
 
+/* ══ Desktop: the sidebar ═══════════════════════════════════════════════════
+   The navigation column is where the eye rests longest, so it carries the
+   most loops — but every one of them is on a *small* element. A loop on the
+   280px column itself would repaint the whole rail sixty times a second to
+   move something the user is not looking at. */
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  /* ── The brand mark breathes ─────────────────────────────────────────────
+     The one loop in the sidebar that runs unattended. It is 24×18 — a few
+     hundred composited pixels — and it is the element a user's eye lands on
+     when they look away from the transcript, so a slow pulse here reads as
+     the product being alive rather than as something twitching.
+
+     `animation` on the *child*, not on `[data-slot="sidebar.brand.mark"]`:
+     the slot is a 0×0 wrapper (measured), and an animation on a zero-area box
+     has nothing to paint. */
+
+  html.fa-tier-full [data-slot="sidebar.brand.mark"] > * {
+    animation: fa-brand-breathe 6.4s ease-in-out infinite;
+    transform-origin: 50% 50%;
+  }
+
+  /* ── Rail edge glow ──────────────────────────────────────────────────────
+     A slow aqua wash along the border between the sidebar and the canvas. It
+     is on a pseudo-element of the column, driven by `opacity` only, and it is
+     the cheapest way to make two flat panes read as two pieces of glass.
+
+     `inset-inline-end`, not `right`: the side the rail sits on is the
+     product's decision, and a physical `right` would go to the wrong edge in
+     a right-to-left build. */
+
+  html.fa-tier-full [data-fa-col="sidebar"]::after {
+    content: "";
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 0;
+    width: 1px;
+    pointer-events: none;
+    opacity: 0.35;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent) 28%,
+      color-mix(in srgb, var(--fa-gloss-top) 70%, transparent) 50%,
+      color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent) 72%,
+      transparent 100%
+    );
+    animation: fa-rail-glow 9.5s ease-in-out infinite;
+  }
+
+  /* The column must be a containing block for that pseudo-element. `relative`
+     rather than `isolation` so the stacking order of the product's own
+     children is untouched. */
+  [data-fa-col="sidebar"] {
+    position: relative;
+  }
+
+  /* ── Rows: a hover glint ─────────────────────────────────────────────────
+     A transition, not an animation, and on `::part`-free children rather than
+     on the row, because the row's `::before`/`::after` belong to the drop
+     indicator and the row itself already runs the product's mount animation.
+
+     `background-position` is normally forbidden by rule 1 — it is here as the
+     single documented exception, on a gradient that is already painted, and it
+     is confined to one row under the cursor. The alternative (a transform on a
+     pseudo-element) would need a stacking context on a row the product
+     recycles. */
+
+  [data-fa-col="sidebar"] [role="treeitem"] {
+    transition: background-position 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  [data-fa-col="sidebar"] [role="treeitem"]:hover {
+    background-position: 0 0;
+  }
+
+  /* ── Rows: the selected row settles ──────────────────────────────────────
+     The product marks selection with `aria-selected="true"` and a background
+     fill. This adds the "lit lens" the active nav item already has, but as a
+     transition rather than a static box-shadow, so switching rows reads as
+     one row handing the light to another.
+
+     `border-radius: inherit` and `inset: 0`: never a fixed width. Row labels
+     are longer in Chinese than in English, and a fixed-width highlight would
+     be correct in one locale and clipped in the other — which is exactly the
+     parity bug this pass has to avoid. */
+
+  [data-fa-col="sidebar"] [role="treeitem"][aria-selected="true"] {
+    box-shadow:
+      inset 0 1px 0 var(--fa-rim-light),
+      inset 0 0 20px -7px var(--fa-inner-glow),
+      0 1px 3px -1px var(--dsw-alias-bg-mask-2);
+    transition:
+      box-shadow 260ms ease,
+      background-color 260ms ease;
+  }
+
+  [data-fa-col="sidebar"] [role="treeitem"][aria-selected="false"] {
+    transition: box-shadow 260ms ease;
+  }
+
+  /* ── The chevron settles ─────────────────────────────────────────────────
+     The product animates the chevron's `transform` for its expand/collapse
+     rotation over 0.12s. Contesting `transform` here would fight it for the
+     property, so this animates `opacity` alone and leaves the rotation to the
+     product. Declared inside the hover block because the element is
+     `display: none` outside it. */
+
+  [data-fa-col="sidebar"] [role="treeitem"]:hover span[class*="chevron"] {
+    animation: fa-chevron-settle 220ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+  }
+
+  /* ── Section headers arrive ──────────────────────────────────────────────
+     "Workspaces" and its siblings mount once per session, so an entrance is
+     honest here in a way it would not be on a virtualised transcript row.
+     `backwards` for the same reason as the floating surfaces: a forwards fill
+     would outrank the product's own inline transform. */
+
+  html.fa-tier-full [data-fa-col="sidebar"] [role="tree"] > * > :first-child {
+    animation: fa-section-in 340ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  /* ── The settings panel blooms ───────────────────────────────────────────
+     `div[slot="sidebar.settings"]` is measured to have **no transition of its
+     own** (`transition-duration: 0s`) and to live inside the sidebar subtree,
+     which is why the existing `[role="dialog"]` entrance does not reach it.
+     It is a legitimate entrance target and this is the only rule covering it. */
+
+  html.fa-tier-full div[slot="sidebar.settings"] {
+    animation: fa-settings-bloom 300ms cubic-bezier(0.22, 1.2, 0.36, 1) backwards;
+    transform-origin: 100% 100%;
+  }
+}
+
+@keyframes fa-brand-breathe {
+  0%,
+  100% {
+    opacity: 0.86;
+    transform: scale(0.965);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.035);
+  }
+}
+
+@keyframes fa-rail-glow {
+  0%,
+  100% {
+    opacity: 0.22;
+  }
+  50% {
+    opacity: 0.58;
+  }
+}
+
+@keyframes fa-chevron-settle {
+  from {
+    opacity: 0;
+    transform: translate3d(-3px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fa-section-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-6px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fa-settings-bloom {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* ══ Desktop: the canvas and the transcript ═════════════════════════════════
+   This is the region rule 3 exists for. The transcript virtualises and streams:
+   rows mount and unmount as the user scrolls, and the DOM changes on every
+   token while a model is answering. Anything anchored to that is paid for once
+   per token.
+
+   Three effects, and each one is placed where it cannot see a token arrive:
+
+   - **The header sheen** is on the header, which streams nothing. It is a loop,
+     but a loop that only touches `opacity` on a pseudo-element the size of a
+     76px band.
+   - **The canvas top light** is on the canvas, which is a single element that
+     never remounts.
+   - **The scroll-edge fog** is the interesting one. It is driven by a passive
+     scroll listener that reads `scrollTop` and writes one attribute — no
+     `:has()`, no per-row selector, no mutation observation. Reading `scrollTop`
+     is a layout read, which is why it goes through `requestAnimationFrame`
+     (see `installScrollEdges` in runtime.js).
+
+   **DO NOT add an `animation` to a transcript row.** The rows are recycled, so
+   a row would re-run its entrance every time it scrolled back into view, and
+   the product's own `.YDXeBa_row-in` already proves how this reads: at 150ms it
+   is a settle, but a longer one replayed on scroll-back is a stutter. */
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  /* ── The header carries a slow light ─────────────────────────────────────
+     A moving highlight along the header's bottom hairline. The header has no
+     transition of its own and never remounts, so there is nothing to contest.
+     `inset-inline` rather than `left`/`right` throughout, so the composition
+     mirrors instead of breaking under a right-to-left build. */
+
+  [data-fa-col="center"] {
+    position: relative;
+  }
+
+  html.fa-tier-full [data-fa-col="center"] [class*="header"]::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -1px;
+    height: 1px;
+    pointer-events: none;
+    opacity: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--dsw-alias-state-business-primary) 70%, transparent) 42%,
+      color-mix(in srgb, var(--fa-gloss-top) 85%, transparent) 50%,
+      color-mix(in srgb, var(--dsw-alias-state-business-primary) 70%, transparent) 58%,
+      transparent 100%
+    );
+    animation: fa-header-sheen 11s ease-in-out infinite;
+  }
+
+  /* ── The canvas is lit from the top ──────────────────────────────────────
+     A single static gradient on the canvas's own `::before`, plus a one-shot
+     entrance. Not `background-position`, not a loop: the canvas is the largest
+     element on the page and the one sitting under the most `backdrop-filter`,
+     so anything animated here is multiplied by every blurred pane above it. */
+
+  html.fa-tier-full [data-fa-canvas]::before {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 160px;
+    pointer-events: none;
+    opacity: 0.5;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  /* ── The scroll edges fog over ───────────────────────────────────────────
+     The plugin plants its own two masks beside the scroll container rather
+     than painting on the container or on a row: the mask has to sit *over* the
+     content and *under* the composer, and it has to not scroll. Two absolutely
+     positioned elements inside the canvas achieve that with no selector on
+     anything the product owns.
+
+     `pointer-events: none` is mandatory — a mask over a transcript would eat
+     every click on the rows beneath it.
+
+     The fades are `opacity` on a fixed gradient, never `mask-image` animation:
+     `mask-image` is a paint-time property and animating it on a full-height
+     element repaints the whole column. */
+
+  [data-fa-scroll-edge] {
+    position: absolute;
+    inset-inline: 0;
+    height: 78px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 260ms ease;
+  }
+
+  [data-fa-scroll-edge="top"] {
+    top: 0;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 88%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  [data-fa-scroll-edge="bottom"] {
+    bottom: 0;
+    background: linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 88%, transparent) 0%,
+      transparent 100%
+    );
+  }
+
+  /* Which masks are lit, by scroll position.
+     The runtime publishes exactly three states and this is the other half of
+     that contract: `top` (nothing above to indicate), `bottom` (nothing below)
+     and `middle` (content both ways). `null` withdraws the attribute entirely
+     and is the resting state for a transcript too short to scroll, so a
+     document that never scrolls looks exactly as it did.
+
+     This block previously asked for `down` and `up` — the words a reader
+     expects, and not the words the runtime writes. Every selector missed, the
+     masks were planted and positioned and permanently transparent, and the
+     failure was invisible because an opacity of 0 is also the correct value in
+     three of the four states. `canvascheck.mjs` drives all three states and
+     asserts the computed opacity, which is what caught it. */
+  [data-fa-scrolled="top"] > [data-fa-scroll-edge="top"],
+  [data-fa-scrolled="middle"] > [data-fa-scroll-edge="top"],
+  [data-fa-scrolled="middle"] > [data-fa-scroll-edge="bottom"],
+  [data-fa-scrolled="bottom"] > [data-fa-scroll-edge="bottom"] {
+    opacity: 1;
+  }
+
+  /* ── The scrollbar thumb lights on hover ─────────────────────────────────
+     The plugin already gradients the thumb; this adds the lift. `box-shadow`
+     on a 8px-wide element is a trivial paint, and it is the one place a
+     non-`transform`/`opacity` transition is worth it, because a scrollbar
+     thumb has no transform box to speak of. */
+
+  ::-webkit-scrollbar-thumb {
+    transition: background-color 200ms ease, box-shadow 200ms ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--fa-rim-light) 60%, transparent),
+      0 0 8px color-mix(in srgb, var(--dsw-alias-state-business-primary) 45%, transparent);
+  }
+}
+
+@keyframes fa-header-sheen {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translate3d(-6%, 0, 0);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translate3d(6%, 0, 0);
+  }
+}
+
+/* ══ Desktop: the composer ══════════════════════════════════════════════════
+   Five effects on the one surface the user actually types into, which makes it
+   the surface where an overdone flourish is most expensive: anything that moves
+   under the caret is a thing the eye reads as a glitch while reading.
+
+   Measured before writing, from `overlays.mjs`:
+
+   - `[data-composer-card]` is `position: relative` and **already transitions
+     `box-shadow` and `border-color` over 0.22s**. Its shadow is therefore off
+     limits — a `box-shadow` animation here would be a second writer on a
+     property the product owns, decided by load order. The focus ring below is
+     drawn on the card's `::after` instead, so it composes with the product's
+     shadow rather than replacing it.
+   - `[data-composer-input]`, `[data-composer-placeholder]` and the lexical
+     editor have **no transition and no animation** of their own.
+   - The placeholder is already `position: absolute`, so it needs no context
+     from us. */
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  /* ── The focus ring ──────────────────────────────────────────────────────
+     A ring that grows to meet the caret when the composer takes focus, on the
+     card's `::after`. `border-radius: inherit` and `inset: -2px` — never a
+     fixed size, for the same locale reason as the sidebar's selected row: the
+     composer's width is driven by the product's content column and its height
+     grows with the text, so any fixed dimension would be correct in one
+     language and wrong in the other. */
+
+  html.fa-tier-full [data-composer-card]::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0;
+    border: 2px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 46%, transparent);
+    transform: scale(0.995);
+    transition:
+      opacity 240ms ease,
+      transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  html.fa-tier-full [data-composer-card]:focus-within::after {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* ── The card lifts ──────────────────────────────────────────────────────
+     `translateY` only, and only 1px. The card is where the eye lives while
+     typing; a scale would move the text relative to the caret.
+
+     The product's own transition covers `box-shadow` and `border-color`, so
+     this **extends** that declaration rather than replacing it. Writing
+     `transition: transform …` alone would drop the product's two properties and
+     silently kill the shadow's easing — which is the failure mode the list of
+     properties here exists to prevent. */
+
+  [data-composer-card] {
+    transition-property: box-shadow, border-color, transform;
+    transition-duration: 0.22s, 0.22s, 0.3s;
+  }
+
+  [data-composer-card]:focus-within {
+    transform: translate3d(0, -1px, 0);
+  }
+
+  /* ── The placeholder shimmers ────────────────────────────────────────────
+     Hero phase only. In the hero the composer is empty by definition and the
+     placeholder *is* the content, so a slow sheen across it reads as an
+     invitation; once a conversation starts, the same animation would run behind
+     the user's own words every time they clear the box, which is noise. The
+     placeholder has no transition of its own, so this costs one composited
+     layer while the box is empty and nothing at all after. */
+
+  html.fa-tier-full [data-phase="hero"] [data-composer-placeholder] {
+    animation: fa-placeholder-shimmer 7.2s ease-in-out infinite;
+  }
+
+  /* ── The caret breathes ──────────────────────────────────────────────────
+     The caret colour pulses while the composer holds focus. `caret-color` is
+     animatable and costs a repaint of a one-pixel column, not of the box. */
+
+  html.fa-tier-full [data-composer-card]:focus-within [data-lexical-editor] {
+    animation: fa-caret-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes fa-placeholder-shimmer {
+  0%,
+  100% {
+    opacity: 0.62;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes fa-caret-pulse {
+  0%,
+  100% {
+    caret-color: var(--dsw-alias-state-business-primary);
+  }
+  50% {
+    caret-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
+  }
+}
+
+/* ══ Desktop: overlays and the system layer ═════════════════════════════════
+   Menus, listboxes, tooltips, the settings dialog and the boot card. Most of
+   these already have an entrance from the top of this file; what is added here
+   is the *inside* of them — items arriving in sequence, a scrim that fades
+   rather than snapping.
+
+   The product's own scrims and dialogs all have **no transition of their own**
+   (measured by `overlays.mjs`), so they are legitimate entrance targets. The
+   `[role="dialog"]` rule at the top of this file already covers the dialog
+   panels; the scrims are separate elements the product mounts alongside them. */
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  /* ── Menu items arrive in sequence ───────────────────────────────────────
+     Staggered by index, capped at six. The cap is deliberate: a menu with forty
+     entries (a workspace list, a file tree) would take most of a second to
+     finish drawing, and the user is already moving the pointer down it. Past
+     the sixth item the delay is simply absent, so a long list arrives as a
+     list. */
+
+  html.fa-tier-full [role="menu"] > *:nth-child(-n + 6) {
+    animation: fa-menu-item-in 220ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  html.fa-tier-full [role="menu"] > *:nth-child(1) { animation-delay: 0ms; }
+  html.fa-tier-full [role="menu"] > *:nth-child(2) { animation-delay: 22ms; }
+  html.fa-tier-full [role="menu"] > *:nth-child(3) { animation-delay: 44ms; }
+  html.fa-tier-full [role="menu"] > *:nth-child(4) { animation-delay: 66ms; }
+  html.fa-tier-full [role="menu"] > *:nth-child(5) { animation-delay: 88ms; }
+  html.fa-tier-full [role="menu"] > *:nth-child(6) { animation-delay: 110ms; }
+
+  html.fa-tier-full [role="listbox"] > *:nth-child(-n + 6) {
+    animation: fa-menu-item-in 200ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  html.fa-tier-full [role="listbox"] > *:nth-child(1) { animation-delay: 0ms; }
+  html.fa-tier-full [role="listbox"] > *:nth-child(2) { animation-delay: 20ms; }
+  html.fa-tier-full [role="listbox"] > *:nth-child(3) { animation-delay: 40ms; }
+  html.fa-tier-full [role="listbox"] > *:nth-child(4) { animation-delay: 60ms; }
+  html.fa-tier-full [role="listbox"] > *:nth-child(5) { animation-delay: 80ms; }
+  html.fa-tier-full [role="listbox"] > *:nth-child(6) { animation-delay: 100ms; }
+
+  /* ── The scrim fades in ──────────────────────────────────────────────────
+     The product's scrims snap from invisible to solid. A 200ms fade is the
+     difference between the app looking like it changed its mind and looking
+     like it opened something. */
+
+  html.fa-tier-full [class*="mask"],
+  html.fa-tier-full [class*="overlay"] {
+    animation: fa-scrim-in 200ms ease backwards;
+  }
+
+  /* ── A focus halo ────────────────────────────────────────────────────────
+     Keyboard focus gets a halo the pointer never sees, because `:focus-visible`
+     is the selector that knows the difference. This is an accessibility win
+     dressed as polish: the product's own focus ring is a hairline border, and a
+     soft halo makes the focused control findable at a glance across a 1440px
+     window. */
+
+  :is(a, button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], input, textarea, [tabindex]):focus-visible {
+    outline: none;
+    animation: fa-focus-halo 280ms ease backwards;
+  }
+
+  /* ── The boot card orbits ────────────────────────────────────────────────
+     The one place a full loop is unambiguously right: the user is waiting,
+     there is nothing else on screen, and it stops the moment boot completes
+     because the card unmounts. `[data-dsh-boot]` already has a rise from the
+     top of this file; this is the light behind the spinner. */
+
+  [data-dsh-boot-spinner] {
+    position: relative;
+  }
+
+  html.fa-tier-full [data-dsh-boot-spinner]::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    pointer-events: none;
+    border: 1.5px solid transparent;
+    border-top-color: color-mix(in srgb, var(--dsw-alias-state-business-primary) 75%, transparent);
+    animation: fa-boot-orbit 1.35s linear infinite;
+  }
+}
+
+@keyframes fa-menu-item-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fa-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fa-focus-halo {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--dsw-alias-state-business-primary) 55%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--dsw-alias-state-business-primary) 18%, transparent);
+  }
+}
+
+@keyframes fa-boot-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 /* ══ Prohibited below the full tier ═════════════════════════════════════════
    The `lite` tier keeps the palette, the material and the mobile layout, and
    drops every *decorative* animation. The tier classes are on `<html>`; the
@@ -220,13 +855,82 @@ html.fa-tier-off :is(button, [role="button"], [role="tab"], [role="menuitem"], [
   display: none;
 }
 
+/* The two sidebar *loops*. The entrances above are one-shot and end at the
+   element's resting state, so they cost nothing after they finish and are
+   allowed to survive into `lite`; a loop never ends, and is exactly what the
+   tier exists to drop. */
+html.fa-tier-lite [data-slot="sidebar.brand.mark"] > *,
+html.fa-tier-off [data-slot="sidebar.brand.mark"] > *,
+html.fa-tier-lite [data-fa-col="sidebar"]::after,
+html.fa-tier-off [data-fa-col="sidebar"]::after {
+  animation: none;
+}
+
+/* Without the loop the rail is a static hairline, which is the right resting
+   state rather than a frozen frame of a pulse. */
+html.fa-tier-lite [data-fa-col="sidebar"]::after,
+html.fa-tier-off [data-fa-col="sidebar"]::after {
+  opacity: 0.3;
+}
+
+/* The header sheen is a loop and goes; the canvas top light is static and
+   stays, because it is part of how the column reads rather than motion. The
+   scroll-edge fog is a transition on a scroll state, not decoration, so it is
+   left alone at every tier — losing it would leave a hard cut at the top of a
+   scrolled transcript, which is a usability regression and not a flourish.
+   It is dropped only at `off`, where the user has asked for the app back. */
+html.fa-tier-lite [data-fa-col="center"] [class*="header"]::after,
+html.fa-tier-off [data-fa-col="center"] [class*="header"]::after {
+  animation: none;
+  opacity: 0;
+}
+
+html.fa-tier-off [data-fa-scroll-edge] {
+  display: none;
+}
+
+/* The composer and overlay *loops* stop below `full`: the placeholder sheen,
+   the caret pulse, the boot orbit. The one-shot entrances (the focus ring, the
+   menu stagger, the scrim fade) are allowed to survive into `lite`, because
+   they finish and cost nothing after — and because a menu that appears with no
+   entrance at all reads as a rendering artefact rather than as a decision. */
+html.fa-tier-lite [data-phase="hero"] [data-composer-placeholder],
+html.fa-tier-off [data-phase="hero"] [data-composer-placeholder],
+html.fa-tier-lite [data-composer-card]:focus-within [data-lexical-editor],
+html.fa-tier-off [data-composer-card]:focus-within [data-lexical-editor],
+html.fa-tier-lite [data-dsh-boot-spinner]::after,
+html.fa-tier-off [data-dsh-boot-spinner]::after {
+  animation: none;
+}
+
+html.fa-tier-off [data-dsh-boot-spinner]::after {
+  display: none;
+}
+
 html.fa-tier-off :is([role="dialog"], [role="menu"], [role="listbox"], [role="tooltip"], [data-tip], [role="status"]) {
   animation: none !important;
 }
 
-/* A background tab has no business compositing a wallpaper, and some engines
-   keep doing it. This is the only global animation rule in the plugin. */
-html[data-fa-idle] * {
+/* ══ Idle ═══════════════════════════════════════════════════════════════════
+   A background tab has no business compositing a wallpaper, and some engines
+   keep doing it. This is the only global animation rule in the plugin.
+
+   Two things here are load-bearing and both have been got wrong once:
+
+   **The attribute is on `<html>`.** The runtime used to publish it on `<body>`
+   while these selectors asked for it on the root element, so the rule never
+   matched anything and a hidden tab animated indefinitely. The writer moved;
+   `idlecheck.mjs` now asserts the two ends agree.
+
+   **`*` does not match pseudo-elements.** The universal selector matches
+   elements only, so an animation on `::before` or `::after` sails straight
+   through it. That was harmless while the skin's only pseudo-element animation
+   was the one-shot press ring, and stops being harmless the moment a *loop*
+   lives on a pseudo-element — which is the only way to light an element
+   without adding a child node to somebody else's tree. Both are listed. */
+html[data-fa-idle] *,
+html[data-fa-idle] *::before,
+html[data-fa-idle] *::after {
   animation-play-state: paused !important;
 }
 
@@ -241,5 +945,77 @@ html[data-fa-idle] * {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Collapsing the duration is enough for an entrance — it lands on its final
+     keyframe immediately. It is *not* enough for a loop: the animation would
+     still be registered, and its computed value would be whichever frame the
+     single iteration stopped on. The sidebar's two loops are given their
+     resting values explicitly, which is also what makes them match the
+     `lite` tier's rendering instead of merely happening to look similar. */
+
+  [data-slot="sidebar.brand.mark"] > * {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+
+  [data-fa-col="sidebar"]::after {
+    animation: none !important;
+    opacity: 0.3;
+  }
+
+  [data-fa-col="sidebar"] [role="treeitem"] {
+    transition: none !important;
+  }
+
+  [data-fa-col="center"] [class*="header"]::after {
+    animation: none !important;
+    opacity: 0;
+  }
+
+  /* The fog is a state indicator rather than motion, so it does not disappear
+     — it just stops crossfading and switches instantly. */
+  [data-fa-scroll-edge] {
+    transition: none !important;
+  }
+
+  /* The composer's two loops settle to their stated resting values, and the
+     focus ring becomes an instant state rather than a grow. */
+  [data-composer-placeholder] {
+    animation: none !important;
+    opacity: 0.62;
+  }
+
+  [data-lexical-editor] {
+    animation: none !important;
+    caret-color: var(--dsw-alias-state-business-primary);
+  }
+
+  [data-composer-card]::after {
+    transition: none !important;
+    transform: none;
+  }
+
+  [data-dsh-boot-spinner]::after {
+    animation: none !important;
+  }
+
+  /* A stagger is motion; without it the items simply appear, which is what a
+     user who asked for reduced motion asked for. */
+  [role="menu"] > *,
+  [role="listbox"] > * {
+    animation: none !important;
+  }
+
+  [class*="mask"],
+  [class*="overlay"] {
+    animation: none !important;
+  }
+
+  :is(a, button, [role="button"], [role="tab"], [role="menuitem"], [role="option"], input, textarea, [tabindex]):focus-visible {
+    animation: none !important;
+    outline: 2px solid var(--dsw-alias-state-business-primary);
+    outline-offset: 2px;
   }
 }

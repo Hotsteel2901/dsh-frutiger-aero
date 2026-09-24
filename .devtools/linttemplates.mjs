@@ -34,6 +34,28 @@
  * state, so it knows which comments are inside a template (signal) and which
  * are outside one (noise).
  *
+ * ## The third failure — and why the anchor is now structural
+ *
+ * A third version looked only for templates passed *inline* to
+ * `page.evaluate(\`…\`)`, matched by looking backwards for that call. That
+ * silently exempted the far more readable style this directory actually uses
+ * for anything longer than a few lines:
+ *
+ *     const snapshot = `(() => { … })()`
+ *     await page.evaluate(snapshot)
+ *
+ * A canary built that way — a two-line template whose second line carried a
+ * backtick in its `//` comment, exactly the defect this file exists for —
+ * reported PASS. So the check no longer depends on where the template sits.
+ * Instead it takes **every** top-level template literal and asks a structural
+ * question about it: does its body lex as JavaScript at all?
+ *
+ * That is the real invariant. A correct page function is a valid expression;
+ * a template cut short by a stray backtick is not, because the remainder of
+ * the comment becomes code. `new Function('return (' + body + ')')` decides it
+ * the same way the engine does, with no guessing about call shape — and it is
+ * constructed, never called, so nothing in a probe file executes.
+ *
  * Usage: node linttemplates.mjs [file ...]   (defaults to every *.mjs here)
  */
 
@@ -48,13 +70,14 @@ const targets = process.argv.slice(2).length
   : readdirSync(HERE).filter((f) => f.endsWith('.mjs')).map((f) => join(HERE, f))
 
 /**
- * Walk a whole source file once, tracking lexical state, and report every
- * `page.evaluate` whose template argument does not close cleanly.
+ * Walk a whole source file once, tracking lexical state, and find every
+ * top-level template literal whose body is not a valid JavaScript expression.
  *
  * State is deliberately minimal — this is a probe harness, not a parser — but
  * it distinguishes the cases that matter: normal code, line comments outside
- * templates, string literals outside templates, and template literals with one
- * level of `${...}` nesting.
+ * templates, string literals outside templates, and template literals with
+ * `${...}` nesting. The verdict for each template is then handed to the engine
+ * rather than to a heuristic.
  */
 function scan(path) {
   const src = readFileSync(path, 'utf8')
@@ -64,10 +87,10 @@ function scan(path) {
   let i = 0
   let inLineComment = false
   let quote = null // "'" or '"' when inside a plain string literal
+  let depth = 0 // brace depth, so templates nested in code are still classified
 
   while (i < src.length) {
     const c = src[i]
-    const prev = src[i - 1]
 
     if (inLineComment) {
       if (c === '\n') inLineComment = false
@@ -97,25 +120,30 @@ function scan(path) {
 
     if (c === "'" || c === '"') { quote = c; i += 1; continue }
 
-    // A template literal is interesting only when it is the argument of a
-    // `page.evaluate(` call. Find that out by looking backwards.
-    if (c === '`') {
-      const before = src.slice(Math.max(0, i - 80), i)
-      const isEvaluateArg = /\bpage\.evaluate\(\s*$/.test(before)
+    if (c === '{') { depth += 1; i += 1; continue }
+    if (c === '}') { depth -= 1; i += 1; continue }
 
+    if (c === '`') {
       const start = i
       const { end, terminated } = lexTemplate(src, i)
+      const body = src.slice(start + 1, terminated ? end - 1 : end)
 
-      if (isEvaluateArg) {
-        const tail = src.slice(end, end + 6)
-        const closesCall = /^\s*\)/.test(tail)
-        if (!terminated || !closesCall) {
-          problems.push({
-            line: lineOf(start),
-            text: src.split('\n')[lineOf(start) - 1].trim().slice(0, 110),
-            note: 'this template ends before the call closes — a backtick inside the body terminated it early',
-          })
-        }
+      // Only inspect a template that is *meant* to be evaluated as a function
+      // in the page. Everything else in these files — a CSS fragment, a log
+      // line, a selector — is legitimately arbitrary text, and parsing it as
+      // code would report valid files as broken. The two shapes that qualify
+      // are the inline IIFE and the IIFE-in-a-variable that these probes use
+      // for page functions; both are recognised by their opening token.
+      const looksLikePageFunction = startsAsPageFunction(body)
+
+      if (looksLikePageFunction && !isValidExpression(body)) {
+        problems.push({
+          line: lineOf(start),
+          text: src.split('\n')[lineOf(start) - 1].trim().slice(0, 110),
+          note: terminated
+            ? 'this template body is not valid JavaScript — a backtick inside it terminated it early'
+            : 'this template is never closed by a backtick',
+        })
       }
 
       i = end
@@ -126,6 +154,75 @@ function scan(path) {
   }
 
   return problems
+}
+
+/**
+ * Does this template body open the way a page function does?
+ *
+ * A page function is an IIFE — `(() => { … })()` — either written inline at
+ * the call or assigned to a variable first. Both begin with the same token:
+ * optional whitespace, then `(`, then optional whitespace, then `(`. Requiring
+ * that shape is what keeps a `console.log` template with a `${…}` in it, or a
+ * CSS snippet, out of the check.
+ *
+ * The distinction matters in both directions. Too loose and every log line is
+ * a false positive, which would make the linter something people route around;
+ * too strict (the previous version matched only inline `page.evaluate(`) and
+ * the defect it exists for walks straight through.
+ *
+ * @param body - the raw text between a template's backticks.
+ * @returns whether it looks like a page function.
+ */
+function startsAsPageFunction(body) {
+  return /^\s*\(\s*\(/.test(body)
+}
+
+/**
+ * Is `body` a valid JavaScript expression?
+ *
+ * The question a stray backtick answers wrong is "does the rest of this still
+ * parse", and the engine is the authority on that. `new Function` is used in
+ * its *compile-only* form: the constructor parses and would throw a
+ * `SyntaxError` on bad input, but the function is never invoked, so nothing in
+ * a probe file runs as a side effect of linting it.
+ *
+ * ## Why the body is flattened rather than passed through
+ *
+ * A real page function is not always parseable text in isolation. Two things
+ * are ordinary and correct to the engine but awkward for a linter holding only
+ * the source:
+ *
+ *   - `${...}` interpolations. The body refers to a caller's variables; left
+ *     alone they would not parse as the linter's own context.
+ *   - nested template literals. A page function that builds markup with
+ *     `card.innerHTML = \`...\`` is the single most backtick-dense shape in
+ *     this directory, and must not be mistaken for the defect.
+ *
+ * So every nested template is replaced wholesale — matched from its escaped
+ * opening backtick to its escaped closing one, which `lexTemplate` has already
+ * established are balanced — and remaining interpolations become literals.
+ * What is left is the function's own skeleton, and that is what gets parsed.
+ *
+ * Neither step is a loophole. Both require the outer template to have lexed
+ * correctly in the first place; a stray backtick in a `//` comment terminates
+ * it during that earlier pass, so the body handed to the engine is truncated
+ * mid-comment and fails to parse. That is the signal, and it is preserved.
+ *
+ * @param body - the raw text between a template's backticks.
+ * @returns whether it parses as an expression.
+ */
+function isValidExpression(body) {
+  const neutralised = body
+    .replace(/\\`[\s\S]*?\\`/g, "'nested'")
+    .replace(/\\\$\{[^}]*\}/g, '0')
+    .replace(/\$\{[^}]*\}/g, '0')
+  try {
+    // Compile only. Never called.
+    new Function(`return (${neutralised})`) // eslint-disable-line no-new-func
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**

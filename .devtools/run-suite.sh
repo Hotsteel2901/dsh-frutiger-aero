@@ -66,11 +66,24 @@ PASS=0
 FAIL=0
 FAILED_NAMES=""
 
+# How long one probe may take before it is killed.
+#
+# This bound exists because its absence cost several hours. A `bash -c` wrapper
+# whose `node` child died without writing anything leaves the wrapper reading
+# the stdout pipe forever, and a suite with no timeout waits with it — the run
+# is not slow, it is *finished* and nobody can tell. `timeout` turns that into a
+# 124 and a red line, which is the only honest answer.
+#
+# 300s is roughly 20x the slowest real probe (the tier and perf sweeps, which
+# each drive three cold browser sessions), so a timeout is a hung process and
+# never a busy machine.
+FA_PROBE_TIMEOUT="${FA_PROBE_TIMEOUT:-300}"
+
 # run <name> <command...>
 run() {
   local name="$1"; shift
   local out
-  out="$("$@" 2>&1)"
+  out="$(timeout -k 10 "$FA_PROBE_TIMEOUT" "$@" 2>&1)"
   local code=$?
   if [ $code -eq 0 ]; then
     PASS=$((PASS + 1))
@@ -78,8 +91,12 @@ run() {
   else
     FAIL=$((FAIL + 1))
     FAILED_NAMES="$FAILED_NAMES $name"
-    printf '  FAIL  %s\n' "$name"
-    printf '%s\n' "$out" | grep -E '^(FAIL| *[0-9.]+:1)' | head -12 | sed 's/^/        /'
+    if [ $code -eq 124 ]; then
+      printf '  FAIL  %s (no answer in %ss — killed)\n' "$name" "$FA_PROBE_TIMEOUT"
+    else
+      printf '  FAIL  %s\n' "$name"
+    fi
+    printf '%s\n' "$out" | grep -E '^(FAIL| *[0-9.]+:1|usage:)' | head -12 | sed 's/^/        /'
   fi
 }
 
@@ -126,6 +143,44 @@ run "no clipped label text" node "$HERE/clipaudit.mjs" "$URL"
 
 echo "── plugin behaviour ──────────────────────────────────────────────"
 run "wallpaper density control" node "$HERE/bubbles.mjs" "$URL"
+
+echo "── desktop effects and animation ─────────────────────────────────"
+# Six probes in a deliberate order: inventory, then each region, then the axes.
+#
+# The inventory goes first on purpose. Every probe below asserts that a
+# *specific* effect lands, so all of them can pass while a seventh effect sits
+# dead — a selector that matches nothing is indistinguishable from one that is
+# switched off, and a per-effect check can only ever confirm the effects someone
+# remembered to name. `effects-manifest.mjs` enumerates the live inventory and
+# asserts a per-region floor, which is the only check here that notices an
+# effect going *missing* rather than an effect going wrong.
+run "effects manifest (floor per region)" node "$HERE/effects-manifest.mjs" "$URL"
+run "sidebar desktop effects" node "$HERE/sidebarcheck.mjs" "$URL"
+run "canvas and scroll-edge masks" node "$HERE/canvascheck.mjs" "$URL"
+run "header sheen once a conversation exists" node "$HERE/headercheck.mjs" "$URL"
+run "composer and overlays" node "$HERE/composercheck.mjs" "$URL"
+# The inventory again, from the other side: `manifest` counts what is *there*,
+# this asks whether every loop *stops* — on the lite tier and when the tab is
+# hidden. A loop that never stops passes every count and is the whole cost.
+run "every loop can be stopped" node "$HERE/loopcheck.mjs" "$URL"
+
+# The three axes Turn 4 named: the same effects at every tier, in both locales,
+# within a frame budget. They are three separate files rather than one because
+# each has a different failure mode and a different fix.
+run "effects at full / lite / off" node "$HERE/effects-tiers.mjs" "$URL"
+run "en and zh are identical" node "$HERE/effects-parity.mjs" "$URL"
+run "effects stay inside a frame budget" node "$HERE/effects-perf.mjs" "$URL"
+
+echo "── the landing page ──────────────────────────────────────────────"
+# Unlike every run above, this one needs no harness and no token: the landing
+# page is a static tree and `landing-site.sh` serves it on its own port. It is
+# invoked through a wrapper so the suite stays one command, and the wrapper
+# starts and stops the server itself rather than requiring the reader to know
+# that a second listener exists.
+run "landing page still works" bash -c \
+  "URL=\$(bash '$HERE/landing-site.sh' start) && node '$HERE/landing.mjs' \"\$URL\"; code=\$?; bash '$HERE/landing-site.sh' stop; exit \$code"
+run "landing page motion layer" bash -c \
+  "URL=\$(bash '$HERE/landing-site.sh' start) && node '$HERE/landingfx.mjs' \"\$URL\"; code=\$?; bash '$HERE/landing-site.sh' stop; exit \$code"
 
 echo "── resources ─────────────────────────────────────────────────────"
 run "no unexpected 4xx/5xx" node "$HERE/netcheck.mjs" "$URL"

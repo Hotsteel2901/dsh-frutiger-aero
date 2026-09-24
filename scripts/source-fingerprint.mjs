@@ -58,6 +58,7 @@ export const SOURCE_INPUTS = [
   'src/css/material.css',
   'src/css/mobile.css',
   'src/css/effects.css',
+  'src/css/showcase.css',
 ]
 
 /**
@@ -65,7 +66,7 @@ export const SOURCE_INPUTS = [
  * and therefore part of what the artifact is. Exported so `build.mjs` and this
  * module cannot disagree about it.
  */
-export const SHEET_ORDER = ['base', 'scenery', 'material', 'mobile', 'effects']
+export const SHEET_ORDER = ['base', 'scenery', 'material', 'mobile', 'effects', 'showcase']
 
 /**
  * The absolute path of `packages/frutiger-aero`.

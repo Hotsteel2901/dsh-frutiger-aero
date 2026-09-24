@@ -66,12 +66,61 @@ html[data-fa-idle] .fa-scene * {
   animation: fa-sun-breathe 26s ease-in-out infinite;
 }
 
+/* ── aurora ─────────────────────────────────────────────────────────────────
+   A slow band of coloured light high in the sky, above the haze so it reads as
+   something in the air rather than something on the ground. Two counter-phased
+   radial blooms, each drifting on its own axis, which is enough to make the
+   band look like it is folding rather than sliding.
+
+   `mix-blend-mode: screen` is what keeps it from announcing itself as a shape:
+   on the bright upper sky it lifts the colour without darkening anything, the
+   way a real high-altitude glow does. */
+.fa-scene__aurora {
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  background:
+    radial-gradient(56% 34% at 22% 16%, color-mix(in srgb, var(--fa-sky-mid) 70%, transparent) 0%, transparent 62%),
+    radial-gradient(48% 28% at 68% 9%, color-mix(in srgb, var(--fa-haze) 78%, transparent) 0%, transparent 66%);
+  animation: fa-aurora-drift 58s ease-in-out infinite;
+}
+
+html.fa-tier-lite .fa-scene__aurora,
+html.fa-tier-off .fa-scene__aurora {
+  display: none;
+}
+
+/* ── clouds ─────────────────────────────────────────────────────────────────
+   Two feathered ellipses on the horizon band. They exist to give the light
+   shafts something to be *in front of*: rays crossing a cloudless sky read as
+   a lens artefact, and rays crossing these read as air. */
+.fa-scene__clouds {
+  top: auto;
+  bottom: 22%;
+  height: 20%;
+  opacity: 0.55;
+  background:
+    radial-gradient(30% 42% at 12% 62%, color-mix(in srgb, var(--fa-gloss-top) 62%, transparent) 0%, transparent 70%),
+    radial-gradient(24% 34% at 32% 48%, color-mix(in srgb, var(--fa-gloss-top) 48%, transparent) 0%, transparent 72%),
+    radial-gradient(34% 44% at 82% 58%, color-mix(in srgb, var(--fa-haze) 55%, transparent) 0%, transparent 74%),
+    radial-gradient(26% 30% at 62% 40%, color-mix(in srgb, var(--fa-gloss-top) 40%, transparent) 0%, transparent 76%);
+  animation: fa-cloud-drift 76s linear infinite;
+}
+
+html.fa-tier-lite .fa-scene__clouds,
+html.fa-tier-off .fa-scene__clouds {
+  display: none;
+}
+
 /* ── haze ───────────────────────────────────────────────────────────────────
    The single most important layer for making the landscape read as *distance*
    rather than as a coloured band. Real air scatters light, so a ridge a
    kilometre away is almost the colour of the sky above it; without this the
    hills are a hard green stripe crossing the page — which is exactly what the
-   first version of this file looked like. */
+   first version of this file looked like.
+
+   The slow breathe is deliberately almost imperceptible (a 4% opacity swing
+   over 34s). It is the layer most responsible for the sky feeling alive rather
+   than printed, and it does that by never quite resolving. */
 .fa-scene__haze {
   background: linear-gradient(
     180deg,
@@ -80,6 +129,7 @@ html[data-fa-idle] .fa-scene * {
     color-mix(in srgb, var(--fa-haze) 55%, transparent) 74%,
     transparent 96%
   );
+  animation: fa-haze-breathe 34s ease-in-out infinite;
 }
 
 /* ── light shafts ───────────────────────────────────────────────────────────
@@ -110,7 +160,13 @@ html.fa-tier-off .fa-scene__rays {
 /* ── hills ──────────────────────────────────────────────────────────────────
    Two ridges, near and far. Ellipses rather than SVG: cheaper, resolution
    independent, and they read as Frutiger Aero's rolling green hills once the
-   far ridge is hazed by the layer above it. */
+   far ridge is hazed by the layer above it.
+
+   Each ridge drifts against the other — the far one slower, the near one
+   faster and in the opposite direction — which is the cheapest parallax there
+   is: two elements, no scroll listener, and the difference in rate is what the
+   eye reads as depth. Amplitudes are tiny (under 1%) because a hill that
+   visibly travels stops being a hill. */
 .fa-scene__hills {
   top: auto;
   /* The horizon sits at four fifths of the viewport. High enough that the
@@ -126,6 +182,7 @@ html.fa-tier-off .fa-scene__rays {
     radial-gradient(72% 100% at 52% 116%, var(--fa-hill-far) 0 99%, transparent 100%),
     radial-gradient(54% 100% at 92% 110%, var(--fa-hill-far) 0 99%, transparent 100%);
   opacity: 0.85;
+  animation: fa-hill-drift-far 64s ease-in-out infinite;
 }
 
 .fa-scene__hills.fa-scene__near {
@@ -134,6 +191,7 @@ html.fa-tier-off .fa-scene__rays {
   background:
     radial-gradient(64% 100% at 26% 118%, var(--fa-hill-near) 0 99%, transparent 100%),
     radial-gradient(58% 100% at 78% 124%, var(--fa-hill-near) 0 99%, transparent 100%);
+  animation: fa-hill-drift-near 47s ease-in-out infinite;
 }
 
 html.fa-tier-lite .fa-scene__hills.fa-scene__far,
@@ -143,13 +201,58 @@ html.fa-tier-off .fa-scene__hills.fa-scene__far {
 
 /* ── water ──────────────────────────────────────────────────────────────────
    The bottom third. The gradient plus the horizon highlight is the entire
-   effect; the shimmer is the caustics layer. */
+   effect; the shimmer is the caustics layer, and the slow swell here is what
+   stops the waterline from being a fixed rule across the page. */
 .fa-scene__water {
   top: auto;
   height: 14%;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--fa-gloss-top) 42%, transparent) 0 1px, transparent 1px),
     linear-gradient(180deg, var(--fa-water-top) 0%, var(--fa-water-deep) 100%);
+  animation: fa-water-swell 39s ease-in-out infinite;
+}
+
+/* A second, finer band of highlight riding on the waterline. Drawn as a
+   pseudo-element rather than another element so the swell above and this
+   glint below can run at different rates without either being nested — which
+   keeps the whole water treatment to one node. */
+.fa-scene__water::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.5;
+  background: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-gloss-top) 34%, transparent) 0 1px,
+    transparent 1px 9px
+  );
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 62%);
+  mask-image: linear-gradient(180deg, #000 0%, transparent 62%);
+  animation: fa-water-shimmer 21s linear infinite;
+}
+
+html.fa-tier-lite .fa-scene__water::after,
+html.fa-tier-off .fa-scene__water::after {
+  display: none;
+}
+
+/* The water itself is the one layer whose *gradient* must survive into `lite`:
+   it is the bottom third of the wallpaper, and hiding it would leave a hole
+   where the horizon used to be. So the layer stays and only its loop stops —
+   which is a different shape from every other gate in this file, and was wrong
+   here until `loopcheck.mjs` enumerated the loops and caught it still running
+   at `lite`.
+
+   The settle values are the animation's own 0% frame, not `none`: stopping a
+   loop leaves the element on whatever frame it stopped at, and the point of
+   the tier is a *still* wallpaper, not a randomly-frozen one. Matching the 0%
+   frame exactly means the `lite` layer sits where a `full` layer sits at the
+   top of its cycle, so switching tiers does not move the waterline. */
+html.fa-tier-lite .fa-scene__water,
+html.fa-tier-off .fa-scene__water {
+  animation: none;
+  opacity: 0.94;
+  transform: translate3d(0, 0.4%, 0) scaleY(1);
 }
 
 /* ── caustics ───────────────────────────────────────────────────────────────
@@ -227,11 +330,17 @@ html.fa-tier-lite .fa-scene__bubble {
    Last, and always on top of the wallpaper. Two jobs: it guarantees the
    contrast floor for text that ends up over the scene, and it is the layer the
    bloom comes from — the soft bright wash at the top is what makes the whole
-   page feel lit from above. */
+   page feel lit from above.
+
+   The bloom breathes on a long, asymmetric cycle. It is the one loop in the
+   scene that changes the *brightness of everything behind the app*, so its
+   amplitude is kept to 6% and its period longer than a reader's dwell time —
+   the effect should be discoverable, never noticeable. */
 .fa-scene__veil {
   background:
     radial-gradient(140% 90% at 50% -20%, color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 0%, transparent 60%),
     linear-gradient(180deg, transparent 0%, var(--fa-scene-veil) 100%);
+  animation: fa-veil-breathe 44s ease-in-out infinite;
 }
 
 /* ── grain ──────────────────────────────────────────────────────────────────
@@ -256,8 +365,15 @@ html.fa-tier-lite .fa-scene::after {
 }
 
 /* ── keyframes ──────────────────────────────────────────────────────────────
-   Five animations for the entire wallpaper. All transform/opacity except the
-   caustics, which is why only the caustics is tier-restricted. */
+   Eleven animations for the entire wallpaper, and every one of them animates
+   only `transform` or `opacity` — with the single exception of the caustics,
+   which is why only the caustics is restricted to the `full` tier.
+
+   The six loops added with the desktop effects pass all follow the same shape:
+   an even number of stops that returns to its starting value, so the cycle has
+   no visible seam however many times it repeats. Where a layer has both a
+   direction and a look to change, the curve is `ease-in-out` and the period is
+   long — a wallpaper loop is meant to be found, not watched. */
 
 @keyframes fa-bubble-rise {
   0% {
@@ -314,11 +430,156 @@ html.fa-tier-lite .fa-scene::after {
   }
 }
 
-/* Reduced motion: the scene stays, because it is the theme, but it stops. */
+/* ── the six added loops ────────────────────────────────────────────────────
+   Each runs on a different period — 58s, 76s, 34s, 64s, 47s, 39s, 21s, 44s —
+   and the periods are coprime-ish on purpose. Layers that share a period
+   visibly re-sync, and a wallpaper whose parts periodically line up reads as a
+   loop; one whose parts never quite do reads as weather. */
+
+@keyframes fa-aurora-drift {
+  0%,
+  100% {
+    transform: translate3d(-2.4%, 0.6%, 0) scale(1.06);
+    opacity: 0.42;
+  }
+  50% {
+    transform: translate3d(2.6%, -1.4%, 0) scale(1.12);
+    opacity: 0.62;
+  }
+}
+
+@keyframes fa-cloud-drift {
+  0% {
+    transform: translate3d(-6%, 0, 0) scale(1.04);
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.62;
+  }
+  100% {
+    transform: translate3d(6%, 0, 0) scale(1.04);
+  }
+}
+
+@keyframes fa-haze-breathe {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.012) translate3d(0, -0.3%, 0);
+  }
+}
+
+@keyframes fa-hill-drift-far {
+  0%,
+  100% {
+    transform: translate3d(-0.5%, 0, 0);
+  }
+  50% {
+    transform: translate3d(0.5%, 0.4%, 0);
+  }
+}
+
+@keyframes fa-hill-drift-near {
+  0%,
+  100% {
+    transform: translate3d(0.7%, 0, 0);
+  }
+  50% {
+    transform: translate3d(-0.7%, 0.5%, 0);
+  }
+}
+
+@keyframes fa-water-swell {
+  0%,
+  100% {
+    transform: translate3d(0, 0.4%, 0) scaleY(1);
+    opacity: 0.94;
+  }
+  50% {
+    transform: translate3d(-0.6%, -0.5%, 0) scaleY(1.03);
+    opacity: 1;
+  }
+}
+
+/* Two counter-drifting bands of highlight, so the waterline is never still and
+   never obviously sliding in one direction. */
+@keyframes fa-water-shimmer {
+  0% {
+    transform: translate3d(-3%, 0, 0);
+    opacity: 0.34;
+  }
+  50% {
+    transform: translate3d(3%, 0.6%, 0);
+    opacity: 0.58;
+  }
+  100% {
+    transform: translate3d(-3%, 0, 0);
+  }
+}
+
+@keyframes fa-veil-breathe {
+  0%,
+  100% {
+    opacity: 0.94;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Reduced motion: the scene stays, because it is the theme, but it stops.
+   The selector is deliberately broader than the layers that existed when this
+   block was written: `.fa-scene *` and `.fa-scene *::after` catch every layer
+   added since, including the waterline glint, which is a pseudo-element and
+   would otherwise be the one part of the wallpaper still moving. */
 @media (prefers-reduced-motion: reduce) {
   .fa-scene,
-  .fa-scene * {
+  .fa-scene *,
+  .fa-scene *::before,
+  .fa-scene *::after {
     animation: none !important;
+  }
+
+  /* The added loops all displace their layer slightly, and freezing them
+     mid-cycle would leave a few of them off-centre. Clearing the transform is
+     what puts the still wallpaper back on the composition it was designed
+     around; the opacity each layer settles at is then stated explicitly below,
+     because the keyframes would otherwise no longer be supplying it. */
+  .fa-scene__aurora,
+  .fa-scene__clouds,
+  .fa-scene__hills,
+  .fa-scene__water,
+  .fa-scene__water::after,
+  .fa-scene__veil {
+    transform: none;
+  }
+
+  .fa-scene__aurora {
+    opacity: 0.5;
+  }
+
+  .fa-scene__clouds {
+    opacity: 0.55;
+  }
+
+  .fa-scene__haze {
+    opacity: 1;
+  }
+
+  .fa-scene__veil {
+    opacity: 1;
+  }
+
+  .fa-scene__water {
+    opacity: 1;
+  }
+
+  .fa-scene__water::after {
+    opacity: 0.5;
   }
 
   .fa-scene__bubbles {

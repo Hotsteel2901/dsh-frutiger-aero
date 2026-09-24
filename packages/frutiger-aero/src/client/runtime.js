@@ -62,7 +62,7 @@
  * after material is what lets a phone reflow a desktop rule without needing a
  * more specific selector.
  */
-const FA_SHEET_ORDER = ['base', 'scenery', 'material', 'mobile', 'effects']
+const FA_SHEET_ORDER = ['base', 'scenery', 'material', 'mobile', 'effects', 'showcase']
 
 /** Preference keys, deliberately namespaced so nothing else can collide. */
 const FA_STORE_KEY = 'frutiger-aero:effects'
@@ -715,23 +715,201 @@ function installDock(ctx) {
 }
 
 /**
- * Pause the wallpaper when nobody is looking at it.
+ * Plant the two scroll-edge fog masks and keep them in step with the scroll.
  *
+ * ## Why this is a listener and not a selector
+ *
+ * The obvious way to fade a transcript's edges is `mask-image` on the scroll
+ * container, or a `:has()` that notices a scrolled row. Both are wrong here.
+ * The container is the product's element, so painting `mask-image` on it means
+ * the plugin owns a property the product may later animate; and a `:has()`
+ * anchored inside the transcript re-matches on every token while a model
+ * streams, which is precisely what `effects.css` rule 3 forbids.
+ *
+ * So the plugin plants **its own** two elements next to the scroll container
+ * and toggles one attribute on their parent. The listener is passive, it reads
+ * exactly one number (`scrollTop`), and it writes only on the *transition*
+ * between "at the top", "in the middle" and "at the bottom" — so a long scroll
+ * settles into zero writes per frame rather than sixty.
+ *
+ * ## Why the read is deferred to a frame
+ *
+ * `scrollTop` is a layout read. Reading it inside the scroll event is safe
+ * *here* because nothing in the same turn writes layout, but the write that
+ * follows (`toggleAttribute`) invalidates style, and doing that synchronously
+ * per scroll event is how a scroll handler becomes the frame budget. Coalescing
+ * through `requestAnimationFrame` makes the read and the write land in one
+ * frame together, and drops every intermediate event in between.
+ *
+ * ## Contract
+ *
+ * - It creates `[data-fa-scroll-edge]` nodes and removes them on teardown.
+ * - It writes `data-fa-scrolled` on the **canvas**, which is the product's
+ *   element, and that is the one attribute the CSS reads. Everything else it
+ *   touches it owns outright.
+ * - It never queries the transcript, never observes it, and never looks at a
+ *   message row.
+ *
+ * @param ctx - client cordis context.
+ * @param state - structural handles from {@link installTagger}.
+ */
+function installScrollEdges(ctx, state) {
+  ctx.effect(() => {
+    // ## Why the canvas is re-resolved instead of captured
+    //
+    // `installTagger` computes `state.canvas` inside a `requestAnimationFrame`,
+    // so at the moment this function is called during `apply()` the field is
+    // still `null` — the tagger has been *installed*, not *run*. Reading it
+    // once here produced a rule that never planted a mask and never retried,
+    // which is indistinguishable from a CSS selector that misses.
+    //
+    // So this resolves on demand and re-resolves when the transcript mounts,
+    // which it does not do at boot: a fresh profile opens on the hero phase
+    // with no conversation, and the scroll container appears later.
+    const resolve = () => {
+      const scroll = document.querySelector('[data-conversation-scroll]')
+      const host = state.canvas ?? document.querySelector('[data-fa-canvas]')
+      return scroll === null || host === null ? null : { scroll, host }
+    }
+
+    const edges = ['top', 'bottom'].map((side) => {
+      const mask = document.createElement('div')
+      mask.dataset.faScrollEdge = side
+      mask.setAttribute('aria-hidden', 'true')
+      return mask
+    })
+
+    let frame = 0
+    let last = null
+    let planted = null
+
+    const measure = () => {
+      frame = 0
+      const resolved = resolve()
+      if (resolved === null) return
+      const { scroll, host } = resolved
+
+      // Plant on first successful resolve, and re-plant if the product replaced
+      // the canvas under us — which it does when the conversation is swapped.
+      if (planted !== host) {
+        for (const mask of edges) host.append(mask)
+        planted = host
+        last = null
+      }
+
+      const top = scroll.scrollTop
+      const max = scroll.scrollHeight - scroll.clientHeight
+      // `max <= 0` is a transcript shorter than its viewport: there is nothing
+      // to fade towards, so both masks stay off rather than both turning on.
+      const next = max <= 1
+        ? null
+        : top <= 1
+          ? 'top'
+          : top >= max - 1
+            ? 'bottom'
+            : 'middle'
+      if (next === last) return
+      last = next
+      if (next === null) host.removeAttribute('data-fa-scrolled')
+      else host.setAttribute('data-fa-scrolled', next)
+    }
+
+    const schedule = () => {
+      if (frame !== 0) return
+      frame = requestAnimationFrame(measure)
+    }
+
+    // The listener has to be on `document` rather than on the scroll container,
+    // because the container does not exist yet at install time and changes
+    // identity when the conversation does. `scroll` does not bubble, but it does
+    // reach a *capturing* listener on an ancestor, which is the one form that
+    // survives a container that has not been created.
+    document.addEventListener('scroll', schedule, { passive: true, capture: true })
+    window.addEventListener('resize', schedule, { passive: true })
+
+    /**
+     * Wait for the transcript, then measure.
+     *
+     * The transcript mounts later than this effect runs, so measuring once is
+     * not enough — a fresh profile opens on the hero phase with no conversation
+     * at all.
+     *
+     * **This loop and `schedule` must not share the `frame` guard.** They did,
+     * and the consequence was that this effect never once planted a mask: on the
+     * iteration where the transcript finally appeared, `retry` had already
+     * stored a pending handle in `frame`, so the `schedule()` it then called hit
+     * its own `if (frame !== 0) return` and returned without scheduling the
+     * measure. The retry burned its remaining attempts and stopped, and the
+     * effect sat there having resolved its elements and done nothing with them.
+     *
+     * Leaving `frame` at zero before handing over is what makes the handoff
+     * work: the retry chain owns `frame` while it is polling, and owns nothing
+     * the moment it stops. `frame` is only ever a *pending-handle* slot for
+     * `schedule`/`measure`, and `retry` is not `schedule`.
+     */
+    let attempts = 0
+    const retry = () => {
+      if (resolve() !== null) {
+        frame = 0
+        schedule()
+        return
+      }
+      if (attempts >= 40) {
+        frame = 0
+        return
+      }
+      attempts += 1
+      frame = requestAnimationFrame(retry)
+    }
+    retry()
+
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame)
+      document.removeEventListener('scroll', schedule, { capture: true })
+      window.removeEventListener('resize', schedule)
+      for (const mask of edges) mask.remove()
+      for (const host of [planted, document.querySelector('[data-fa-canvas]')]) {
+        host?.removeAttribute('data-fa-scrolled')
+      }
+    }
+  }, 'frutiger-aero: scroll edges')
+}
+
+/**
+ * Pause every animation when nobody is looking at it.
  * A background tab keeps compositing its animations in some engines; a skin
  * that quietly drains a battery is a worse trade than a still wallpaper.
+ *
+ * ## The element this writes to is not a detail
+ *
+ * It writes to `documentElement`, and it has to. Every rule that reads the
+ * attribute is written `html[data-fa-idle] …`, which matches only when the
+ * attribute is on the root element. This function used to write it to
+ * `<body>` — one line, and the consequence was that the governor never once
+ * fired: the attribute appeared, no selector matched it, and a hidden tab kept
+ * compositing all twenty-five animations the skin ships. It was written,
+ * documented and tested for by nobody, which is why it survived several
+ * releases.
+ *
+ * The rules were right and the writer was wrong, so the writer moved. The
+ * regression is now covered by `idlecheck.mjs`, which asserts both halves
+ * separately — that hiding the page publishes the attribute *where the rules
+ * read it*, and that the rules then reach elements, pseudo-elements and the
+ * wallpaper alike.
  *
  * @param ctx - client cordis context.
  */
 function installIdleGovernor(ctx) {
+  const root = document.documentElement
   ctx.effect(() => {
     const sync = () => {
-      document.body.toggleAttribute('data-fa-idle', document.hidden)
+      root.toggleAttribute('data-fa-idle', document.hidden)
     }
     document.addEventListener('visibilitychange', sync)
     sync()
     return () => {
       document.removeEventListener('visibilitychange', sync)
-      document.body.removeAttribute('data-fa-idle')
+      root.removeAttribute('data-fa-idle')
     }
   }, 'frutiger-aero: idle governor')
 }
@@ -911,6 +1089,7 @@ function apply(ctx) {
   const { state } = installTagger(ctx)
   installMobileLayer(ctx, state)
   installDock(ctx)
+  installScrollEdges(ctx, state)
   installIdleGovernor(ctx)
 
   const rerender = () => {

@@ -65,10 +65,16 @@ function bubble(random, index) {
 /**
  * Build the whole wallpaper.
  *
- * Layer order is depth order, back to front: sky, sun, haze, light shafts,
- * two hill ridges, water, caustics, bubbles, veil. The veil is last on purpose
- * — it is the layer that guarantees text contrast over whatever is beneath it,
- * and it must not be able to be overdrawn by a bubble.
+ * Layer order is depth order, back to front: sky, sun, aurora, haze, light
+ * shafts, clouds, two hill ridges, water, caustics, bubbles, veil. The veil is
+ * last on purpose — it is the layer that guarantees text contrast over whatever
+ * is beneath it, and it must not be able to be overdrawn by a bubble.
+ *
+ * `aurora` and `clouds` were added with the desktop effects pass. They are
+ * plain divs with a gradient and one animation each, costing one composited
+ * layer apiece and no nodes per call: the whole point of building the scene
+ * this way is that a busier wallpaper is a few more layers, not a few hundred
+ * more elements.
  *
  * @param count - bubble count for the active performance tier.
  * @returns the scene root, ready to append.
@@ -86,8 +92,10 @@ function createScenery(count) {
   const layers = [
     'sky',
     'sun',
+    'aurora',
     'haze',
     'rays',
+    'clouds',
     'hills far',
     'hills near',
     'water',

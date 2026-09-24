@@ -4,6 +4,155 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-09-24
+
+The desktop pass: a large amount of animation, held inside a measured budget,
+leaving the phone build untouched and rendering identically in both languages.
+
+### Added
+
+- **A sixth stylesheet, `showcase.css`, carrying the desktop effect layer.** It
+  is wrapped in a single `@media (min-width: 1024px) and (hover: hover) and
+  (pointer: fine)` block, so it cannot reach a phone by construction — the mobile
+  layout is unaffected, and the guard is one condition rather than a prefix
+  repeated across eighty rules.
+
+  What it adds, by region:
+
+  | region | loops | entrances | transitions |
+  | --- | --- | --- | --- |
+  | boot horizon | 1 | — | — |
+  | hero lift + glint | 2 | — | — |
+  | transcript | 1 | 1 | 5 |
+  | sidebar rows | — | — | 7 |
+  | canvas top wash | — | — | 1 |
+  | composer | 3 | 1 | 9 |
+  | right panel, dockkit | — | — | 6 |
+
+  Loop periods are deliberately coprime-ish (26s, 34s, 39s, 42s, 44s, 47s, 58s,
+  64s, 76s), because layers sharing a period visibly re-sync and a wallpaper
+  whose parts line up periodically reads as a loop rather than as weather.
+
+- **`animation-composition: add` on the hero lift**, so the desktop breathing
+  composes with the focus lift instead of replacing it. The breathing rides on
+  `scale` rather than a second `translate3d`, because under `add` two
+  translations merge into one matrix and the scale term is lost (see Fixed).
+
+- **`.devtools/DESKTOP-EFFECTS.md`**, which records the anchor vocabulary this
+  product actually has, the ten `data-*` attributes that *look* plausible and do
+  not exist, the measured cost per tier, and the four measurement traps that cost
+  real time here.
+
+### Fixed
+
+- **The hero breathing replaced the composer's focus lift instead of adding to
+  it.** `effects.css` lifts the card 1px on `:focus-within`; `showcase.css`
+  breathes it on the same property. An animation at the animation origin beats a
+  normal declaration regardless of specificity or sheet order, so the breathing
+  won outright and the focus affordance was silently gone — the card still moved,
+  which is why it looked fine: it measured `-0.53px` where the lift alone is
+  `-1px`.
+
+  `animation-composition: add` made both writers visible, but the first version
+  of that fix was still wrong: `add` merges two *translations* into a single
+  matrix rather than nesting them, so `translate3d(0, -1px, 0)` plus a breathing
+  `translate3d(0, -0.5%, 0)` collapsed to `matrix(1, 0, 0, 1, 0, -1)` with **no
+  scale term at all** — the breathing contributed translation and dropped the
+  `scaleY(0.99)` the focus lift exists to show. The apparent `-1.29px` was that
+  merged translation overshooting, not a working composition. The breathing now
+  animates `scale`, which sits outside the `transform` list and composes
+  multiplicatively: the lift holds a clean `-1px` at every phase while `scale`
+  travels `1 → 0.995 → 0.99 → 0.995`. `composercheck.mjs` asserts all three facts
+  (lift present, breathing live on `scale`, both at once) because the previous
+  assertions could not distinguish this state from the broken one.
+
+- **`effects-perf.mjs` was passing without measuring**, in three independent
+  ways, and its red-proof had been refused. All three are fixed, and the same
+  injected defect that was invisible before now fails as it should:
+
+  - the keyframe scan read `sheet.cssRules` at the top level only, and
+    `showcase.css` is one `@media` block, so it saw nothing in the file it was
+    meant to police (`top: 1`, `inner: 44`);
+  - the animation scan used `getComputedStyle(el)`, which never reports a
+    *pseudo-element's* animation — measured 0 hosts for `fa-step-pulse` against
+    3 through `getComputedStyle(el, '::before')`;
+  - it measured the hero only, where the transcript, seat and pulse effects do
+    not exist yet.
+
+  The probe now counts 58 animations and 49 plugin animations at `full`, up from
+  47 and 40.
+
+- **De-probed three false positives that were testing the wrong thing.** The
+  per-tier probe asserted a ceiling on `longtask` entries, which are the product's
+  own startup — `off` reports the same 2–3 tasks as `full`, on this machine, in
+  the same window — and so it now asserts *attribution* (`full` must not add
+  stalls over the `off` control) rather than a total. The same probe failed on a
+  404 for `/open-in-app/icon/filemanager`, a host route that 404s on every tier;
+  known product 404s are now reported in a `note` line while every other console
+  error still fails the run. And two `composercheck` assertions were reading
+  values mid-transition (`0.42`/`0.47`/`0.55` for an opacity settling to `1`) and
+  pinning one exact frame of a 7.4s loop, both of which are coin flips rather
+  than checks.
+
+- **`effects-manifest` counted declared-but-inert transitions.** It treated any
+  `transition-property` other than `all`/`none` as a live transition without
+  checking the duration, so an element declaring a property at `transition-
+  duration: 0s` counted as an effect. With the test corrected, the composer
+  region's real transition count at rest is `0` — its card ring is declared on a
+  `::after` whose duration is zero until `:focus-within` matches — and the floor
+  was corrected to say so, with the hover behaviour asserted where it can
+  actually be reached.
+
+- **`run-suite.sh` could hang for hours.** A probe whose `node` child died
+  without writing output left its `bash -c` wrapper reading the stdout pipe
+  forever, and the suite waited with it — the run was not slow, it was finished
+  and unintelligible. Every probe now runs under `timeout -k 10 300`, and a
+  killed probe reports `(no answer in 300s — killed)`.
+
+- **`landing-site.sh start` never returned when its output was captured.** The
+  server was launched as `( cd "$DOCS" && setsid python3 -m http.server … & )`,
+  which detaches the *session* but leaves the server a live child of the script —
+  so `bash` waited in `do_wait` for a process that by design never exits. Because
+  the suite calls it through a command substitution (`URL=$(landing-site.sh start)`),
+  the still-running server held the pipe's write end open and the substitution
+  never saw EOF. The landing probes therefore never started; they were the only
+  red line in the suite, and the probe itself was innocent. All three descriptors
+  are now closed at the subshell level, and `start` returns in `0.31s` where it
+  previously hung indefinitely.
+
+- **The Harness was serving a profile from an earlier session.**
+  `landing-site.sh` and `deploy.sh` honour `DSH_HOME`, but a Harness started
+  without it reads `~/.dsh`, which held a plugin copy dated 12 days earlier with
+  none of the desktop effects in it. Every build and deploy reported success
+  while the browser loaded a bundle with no `showcase.css` at all — which read as
+  "the stylesheet is not being served" and was *nearly* diagnosed as a CSS bug.
+  `deploy.sh` now warns when the default home differs from the deploy target, and
+  the standing check is documented in the devtools README.
+
+- **Two dead selectors in `showcase.css`.** The step-pulse block listed three
+  selector chains "to be safe"; measured on a page with three conversations open,
+  only `[data-chat-flow] [data-chat-flow-kind] [data-state="ok"]` matches (3
+  hosts). The other two — the space-less `[data-chat-flow-kind][data-state]` form
+  and the `[data-turn-process] [data-state="ok"]` form — match nothing, because
+  the kind row is an *ancestor* of the step row rather than the row itself, and
+  `[data-turn-process]` never contains a `[data-state="ok"]`.
+
+- **`shots.mjs` could not open the desktop settings dialog.** It clicked
+  `[aria-label="Settings"]`, which resolves to a **zero-sized, `display: none`**
+  node — the only English-labelled "Settings" on the page belongs to the *mobile*
+  dock. The real desktop control renders the stored locale's own string (`设置`),
+  so the step would fail under any non-English locale. It now finds the trigger
+  structurally, independent of locale and of the product's hashed class names.
+
+### Changed
+
+- `effects-parity.mjs` now compares **rendered motion** in both locales, not only
+  declared motion. Declarations agreeing is necessary and not sufficient: the
+  same keyframe read at two different phases returns two different values. Eight
+  moving windows are now paused to four pinned phases of their own curve through
+  `document.getAnimations()` and compared as rendered `transform` and `opacity`.
+  Both languages match at every phase.
+
 ## [1.0.5] — 2026-09-21
 
 ### Fixed

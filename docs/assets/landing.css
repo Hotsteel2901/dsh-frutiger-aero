@@ -926,7 +926,17 @@ html.is-lite .aurora {
   transform: none;
 }
 
-.is-offscreen * {
+/* Pause every loop inside a scope that has scrolled away.
+   The three selectors are not redundant: `*` matches **elements only**, so a
+   loop that lives on a pseudo-element keeps running unless that pseudo-element
+   is named explicitly. `animation-play-state` is inherited, but pseudo-elements
+   do not inherit through the element the way a child element does — each one
+   has to be listed. This is the same defect the plugin's idle governor had, and
+   it was found here the same way: by enumerating the loops instead of testing
+   one of them. */
+.is-offscreen *,
+.is-offscreen *::before,
+.is-offscreen *::after {
   animation-play-state: paused !important;
 }
 
@@ -1398,6 +1408,537 @@ html[data-lang='zh'] [data-lang-block='en'] {
     opacity: 0.35;
     bottom: auto;
     top: calc(12% + var(--lift, 0vh) * 3.4);
+    transform: none;
+  }
+}
+
+/* ══ Motion, layer two ══════════════════════════════════════════════════════
+
+   The first pass gave the page a wallpaper that moves and sections that fade
+   in. This block is everything else: the page's own chrome, the panes, the
+   media, the numbers and the small pieces, so that no region of the page is
+   the one place animation forgot.
+
+   Four rules, the same four the plugin's desktop block keeps:
+
+     1. **`transform` and `opacity` only.** Nothing here animates `width`,
+        `height`, `top`, `filter` or `background-position`, because every one of
+        those forces a layout or a paint on each frame. The one exception is
+        `background-position` on the two text-shine effects, which is why they
+        are gated to the full tier and paused off screen — see the note on
+        `.stat__num` below.
+     2. **Entrances only on things that mount once.** Nothing here re-animates
+        when you scroll back to it; the reveal classes are one-shot by design.
+     3. **Every loop is gated twice** — on `html.is-lite` (the device cannot
+        afford it) and on `html.is-offscreen` (it cannot be seen). A loop that
+        is neither seen nor affordable costs nothing.
+     4. **Reduced motion gets the finished page.** Each loop has a settle value
+        equal to its own 0% frame, so switching the animation off does not move
+        anything — the page simply stops.
+
+   Everything below is inside the same `.section` clipping context as the rest
+   of the file, and adds no new scroll listener: the effects ride the observers
+   `landing.js` already installs. */
+
+/* ── The header: a sheen that sweeps when the bar docks ────────────────── */
+
+.header__inner {
+  position: relative;
+}
+
+.header.is-stuck .header__inner::after {
+  content: '';
+  position: absolute;
+  inset: -1px 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 58%, transparent) 22%,
+    color-mix(in srgb, var(--gloss-top) 92%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 58%, transparent) 78%,
+    transparent
+  );
+  opacity: 0;
+  animation: header-dock 760ms var(--ease) 1 both;
+}
+
+@keyframes header-dock {
+  from {
+    opacity: 0;
+    transform: scaleX(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.brand__drop {
+  animation: brand-bob 7s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+@keyframes brand-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -2px, 0) scale(1.045);
+  }
+}
+
+/* ── Panes: one hover lift, shared ─────────────────────────────────────── */
+
+/* `.card` already clips its children (`overflow: hidden`) and `.method` is a
+   pane of the same family, so both take the same treatment. The transition
+   names `box-shadow` and `transform` together rather than using `all`, so a
+   later addition cannot accidentally inherit a transition it did not ask for. */
+.card,
+.method,
+.stat,
+details.qa {
+  transition:
+    transform 320ms var(--ease),
+    box-shadow 320ms var(--ease);
+}
+
+.card:hover,
+.method:hover {
+  transform: translate3d(0, -3px, 0);
+  box-shadow:
+    0 30px 60px -30px var(--shadow-deep),
+    0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent),
+    inset 0 1px 0 var(--rim);
+}
+
+/* The gloss travels rather than jumps. `background-position` is the one
+   non-composited property in this file; it is a 0.9s one-shot on hover, not a
+   loop, and the browser has nothing else to do at that moment. */
+.card__icon {
+  transition:
+    transform 420ms var(--ease),
+    box-shadow 420ms var(--ease);
+}
+
+.card:hover .card__icon {
+  transform: translate3d(0, -1px, 0) rotate(-3deg) scale(1.06);
+}
+
+/* ── The aurora gains a third counter-drift, and the veil breathes ─────── */
+
+/* The aurora is a child of the section's `.shell`, not of the section itself
+   (see the markup at `#performance`), so the child combinator here is
+   `.shell > .aurora` — a `.section > .aurora` selector matches nothing and
+   looks identical to an effect that is simply switched off. */
+.shell > .aurora::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    30% 38% at 62% 24%,
+    color-mix(in srgb, var(--accent) 16%, transparent) 0%,
+    transparent 70%
+  );
+  animation: aurora-pulse 21s ease-in-out infinite;
+}
+
+@keyframes aurora-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translate3d(-3%, 2%, 0) scale(1.12);
+  }
+}
+
+/* ── Numbers: the one written-value animation, on purpose ──────────────────
+
+   `background-position` on a clipped text run is the only way to make the
+   gradient inside the numerals travel, and it cannot be done with a transform
+   because the clip follows the text box. It is a 14-second loop, it is
+   `background-clip: text` so nothing outside the glyphs is painted, and it is
+   dropped at `lite` and paused off screen — which is the whole reason that
+   gate exists rather than a blanket ban. */
+.stat__num {
+  background-size: 220% 100%;
+  animation: stat-sheen 14s ease-in-out infinite;
+}
+
+@keyframes stat-sheen {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+html.is-lite .stat__num,
+html.is-lite .brand__drop,
+html.is-lite .shell > .aurora::after {
+  animation: none;
+}
+
+html.is-lite .shell > .aurora::after {
+  opacity: 0.55;
+}
+
+/* ── The command box: a sweeping caret line and a live copy state ───────── */
+
+.cmd {
+  position: relative;
+  overflow: hidden;
+}
+
+.cmd::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 78%, transparent) 40%,
+    color-mix(in srgb, var(--accent) 78%, transparent) 60%,
+    transparent
+  );
+  opacity: 0.7;
+  animation: cmd-caret 3.4s ease-in-out infinite;
+}
+
+@keyframes cmd-caret {
+  0%,
+  100% {
+    transform: translate3d(0, -14%, 0) scaleY(0.7);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translate3d(0, 14%, 0) scaleY(1);
+    opacity: 0.9;
+  }
+}
+
+/* The copy button answers in place: a ring that expands once and fades. */
+.cmd__copy {
+  position: relative;
+}
+
+.cmd__copy::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cmd__copy[data-copied='true']::after {
+  animation: copy-ring 700ms var(--ease) 1 both;
+}
+
+@keyframes copy-ring {
+  from {
+    opacity: 0.9;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.16);
+  }
+}
+
+html.is-lite .cmd::before {
+  animation: none;
+  opacity: 0.5;
+  transform: none;
+}
+
+/* ── Media: the frames drift, the screenshots settle ────────────────────── */
+
+/* `.device` already carries a transform from the hero parallax (an inline
+   style written by `landing.js`) and a 500ms transform transition. An
+   animation on the same property would fight the inline write, so the drift
+   goes on the *inner* image and the parallax keeps the frame. */
+.device img {
+  animation: device-settle 900ms var(--ease) 1 both;
+}
+
+@keyframes device-settle {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* The sheen is a pseudo-element on the phone frame, so the frame has to be a
+   containing block. It is not given one by the existing rules — `.device` is
+   only `transform`ed, which creates a containing block for *absolute*
+   descendants, and `::after` with `inset: 0` would have resolved against that
+   instead. Stating `position: relative` keeps the sheen inside the frame it
+   belongs to whether or not the parallax has written its transform yet. */
+.device--phone {
+  position: relative;
+}
+
+.device--phone::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    136deg,
+    color-mix(in srgb, var(--gloss-top) 62%, transparent) 0%,
+    transparent 26%,
+    transparent 72%,
+    color-mix(in srgb, var(--gloss-top) 34%, transparent) 100%
+  );
+  opacity: 0;
+  animation: frame-sheen 9s ease-in-out infinite;
+}
+
+@keyframes frame-sheen {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translate3d(-2%, 0, 0);
+  }
+  50% {
+    opacity: 0.6;
+    transform: translate3d(2%, 0, 0);
+  }
+}
+
+html.is-lite .device--phone::after {
+  animation: none;
+  opacity: 0.4;
+  transform: none;
+}
+
+/* ── Bubbles outside the wallpaper ─────────────────────────────────────── */
+
+/* The wallpaper bubbles rise on the fixed scene layer. These are the ones that
+   belong to a pane — decorative, few, and clipped by their own container. */
+.card__icon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at 68% 22%,
+    color-mix(in srgb, var(--bubble-core) 88%, transparent) 0 12%,
+    transparent 42%
+  );
+  opacity: 0.5;
+  animation: icon-bloom 5.5s ease-in-out infinite;
+}
+
+@keyframes icon-bloom {
+  0%,
+  100% {
+    opacity: 0.34;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.12);
+  }
+}
+
+html.is-lite .card__icon::after {
+  animation: none;
+  opacity: 0.5;
+}
+
+/* ── The comparison row: a divider that breathes between the two sides ──── */
+
+.compare {
+  position: relative;
+}
+
+.compare::after {
+  content: '';
+  position: absolute;
+  inset: 8% auto 8% 50%;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 40%, transparent) 30%,
+    color-mix(in srgb, var(--accent) 40%, transparent) 70%,
+    transparent
+  );
+  opacity: 0.5;
+  animation: divider-breathe 6.5s ease-in-out infinite;
+}
+
+@keyframes divider-breathe {
+  0%,
+  100% {
+    opacity: 0.22;
+    transform: scaleY(0.86);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scaleY(1);
+  }
+}
+
+@media (max-width: 700px) {
+  .compare::after {
+    display: none;
+  }
+}
+
+/* ── Table: rows answer the pointer, and the header stays lit ──────────── */
+
+tbody tr {
+  transition: background-color 220ms var(--ease);
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+td,
+th {
+  transition: color 220ms var(--ease);
+}
+
+tbody tr:hover td {
+  color: var(--ink);
+}
+
+/* ── FAQ: the answer unfolds rather than appearing ─────────────────────── */
+
+details.qa[open] > *:not(summary) {
+  animation: qa-open 320ms var(--ease) 1 both;
+}
+
+@keyframes qa-open {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+details.qa summary::after {
+  transform-origin: 50% 50%;
+}
+
+details.qa:hover summary::after {
+  opacity: 1;
+}
+
+/* ── Footer: a slow light along the top hairline ───────────────────────── */
+
+.footer {
+  position: relative;
+  overflow: hidden;
+}
+
+.footer::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 46%, transparent) 30%,
+    color-mix(in srgb, var(--gloss-top) 84%, transparent) 50%,
+    color-mix(in srgb, var(--accent) 46%, transparent) 70%,
+    transparent
+  );
+  opacity: 0.5;
+  transform-origin: 50% 50%;
+  animation: footer-light 11s ease-in-out infinite;
+}
+
+@keyframes footer-light {
+  0%,
+  100% {
+    opacity: 0.24;
+    transform: scaleX(0.82);
+  }
+  50% {
+    opacity: 0.72;
+    transform: scaleX(1);
+  }
+}
+
+html.is-lite .footer::before,
+html.is-lite .compare::after {
+  animation: none;
+  opacity: 0.45;
+  transform: none;
+}
+
+html.is-lite .card__icon,
+html.is-lite .card:hover .card__icon {
+  animation: none;
+}
+
+/* ── The whole page under reduced motion ───────────────────────────────────
+
+   The rule above this block already collapses every duration to nothing. What
+   it cannot do is give a paused *loop* a resting pose, so each loop's settle
+   value is stated here as well: no element is left mid-frame, and the page
+   reads as a finished design rather than a stopped animation. */
+@media (prefers-reduced-motion: reduce) {
+  .brand__drop,
+  .shell > .aurora::after,
+  .cmd::before,
+  .device--phone::after,
+  .card__icon::after,
+  .compare::after,
+  .footer::before,
+  .stat__num {
+    animation: none !important;
+  }
+
+  .brand__drop,
+  .shell > .aurora::after,
+  .device--phone::after,
+  .card__icon::after,
+  .compare::after,
+  .footer::before {
+    transform: none !important;
+    opacity: 0.5;
+  }
+
+  .cmd::before {
+    transform: none !important;
+    opacity: 0.5;
+  }
+
+  .stat__num {
+    background-position: 0% 50%;
+  }
+
+  .device img {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .card:hover,
+  .method:hover {
     transform: none;
   }
 }

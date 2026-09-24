@@ -1,0 +1,718 @@
+/*
+ * showcase.css — the desktop effects layer, part two.
+ *
+ * `effects.css` animates *structure*: the wallpaper's owners, the two columns,
+ * the header, the composer, the overlays. It is deliberately spare about the
+ * inside of a page, because that is where the volume lives and where the
+ * product's own layout is easiest to disturb.
+ *
+ * This file is the volume. It is last in the cascade, after `effects.css`, so a
+ * rule here wins a tie; and everything below sits inside one
+ * `min-width: 1024px and hover: hover and pointer: fine` block rather than
+ * being prefixed selector by selector. Two reasons:
+ *
+ *   1. **It cannot reach a phone.** Turns 2 and 3 were both about the phone
+ *      experience, and the mobile layer is tuned and verified on its own. A new
+ *      desktop loop that quietly also ran at 390px would be a regression
+ *      against shipped, tested work. One media query is one thing to verify
+ *      instead of eighty selectors.
+ *   2. **The fingerprint covers bytes, not selectors.** One more file in
+ *      `SOURCE_INPUTS` and one more entry in `SHEET_ORDER` is the whole
+ *      integration; nothing in `runtime.js` changes shape.
+ *
+ * ## Anchors
+ *
+ * The product hashes its CSS-module class names per build (`.pI_x6G_sidebarCol`,
+ * `.hHd-Xa_brand`), so a class selector here would be dead on the next upgrade.
+ * What it keeps stable is the `data-*` vocabulary its own styles depend on, and
+ * that is what every rule below is written against:
+ *
+ *   `data-phase`              `hero` / `active` / `plain` — the app's three modes
+ *   `data-chat-flow*`         one conversation flow and its turn
+ *   `data-turn-tail`          the trailing block of a turn
+ *   `data-turn-process*`      the collapsible process disclosure inside a turn
+ *   `data-disclosure-row`     a summary row that expands
+ *   `data-expandable`         the chevron-carrying expander
+ *   `data-dockkit-*`          the split-pane dock surfaces
+ *   `data-sidebar-right-*`    the right panel, its toggle and its mode
+ *   `data-composer-*`         the composer card, seat, input, stats, placeholder
+ *   `data-slot`               named extension points (`sidebar.settings`, …)
+ *   `data-fa-*`               the plugin's own published state
+ *
+ * Every one of those was read off a *running* page before a selector used it.
+ * That matters more than it sounds: the obvious-looking names — a
+ * `data-approval-scroll`, a `data-code-block-content`, a `data-trajectory-row-key`
+ * — do not exist in this product at all, and a rule written against one is
+ * invisible. It renders as nothing, in every environment, forever, and no
+ * per-effect check would ever notice. The absence is what this file was
+ * rewritten to fix, and it is why `effects-manifest.mjs` asserts a per-region
+ * floor rather than only checking the effects someone remembered to name.
+ *
+ * ## The three shapes of an effect, and the rules they keep
+ *
+ *   - a **loop** (`animation: fa-x … infinite`) — runs forever, costs a
+ *     compositor layer, and must be stoppable at `lite` and at `off`;
+ *   - a **transition** — no cost at rest, fires on a state the product already
+ *     sets, and the cheapest polish there is;
+ *   - an **entrance** — fires once, at mount. Safe on anything that mounts
+ *     once, wrong on anything React re-renders, because a re-render replays it.
+ *
+ * `effects.css` states three rules and they hold here without exception:
+ *
+ *   1. **Only `transform` and `opacity`.** No `width`, `height`, `top`, `left`,
+ *      `margin`, `padding`, `background-position` or `box-shadow` animation
+ *      anywhere below. `effects-perf.mjs` reads the running page's keyframes
+ *      back and fails on a single violation, so this is enforced, not intended.
+ *   2. **An entrance only on something that mounts once.** Turn tails, list
+ *      rows and toasts qualify. Flows, disclosures and expanders do **not** —
+ *      the product re-renders those as a conversation streams, so they get
+ *      transitions, which are idempotent.
+ *   3. **Nothing watches the transcript.** No `MutationObserver`, no scroll
+ *      handler, no `:has()` over a message. Every rule hooks a state attribute
+ *      the product already maintains, a pseudo-class the engine evaluates for
+ *      free, or a custom property it already writes.
+ *
+ * ## What is not here, and why
+ *
+ * The right panel and the dockkit surfaces carry transitions but no loops; the
+ * desktop block in `effects.css` records both omissions and the reasoning is
+ * unchanged. The short version: the right panel already transitions its own
+ * `transform` and `visibility` over 0.3s, so a second transform animation would
+ * fight it; and an animated surface beneath a control the user is *dragging* is
+ * a moving target.
+ *
+ * Every loop declared here has a stop rule in the `lite` / `off` section at the
+ * end of the file. `loopcheck.mjs` enumerates them and fails if one is missing
+ * — an unstoppable loop is the entire cost of a feature like this.
+ */
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+
+/* ── the boot moment ────────────────────────────────────────────────────────
+   A desktop session begins by looking at the boot surface: the wallpaper is
+   already painted, the app is not, and for a moment the page is a still
+   picture. The plugin can make that moment read as *starting* rather than as
+   *stalled*.
+
+   `[data-dsh-boot]` is present only during boot — the product removes it — so
+   this is the one effect in the file that is guaranteed never to be on screen
+   at the same time as anything else. It is a pseudo-element, so the boot
+   surface's own layout is untouched. */
+
+[data-dsh-boot] {
+  position: relative;
+}
+
+[data-dsh-boot]::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 52%;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--fa-gloss-top) 26%, transparent) 40%,
+    color-mix(in srgb, var(--fa-sky-mid) 34%, transparent) 100%
+  );
+  animation: fa-boot-horizon 2.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes fa-boot-horizon {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 26%, 0) scaleY(0.68);
+  }
+  52% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -10%, 0) scaleY(1.1);
+  }
+}
+
+/* ── the hero ───────────────────────────────────────────────────────────────
+   Before a conversation exists the app shows `data-phase="hero"`: a title, a
+   composer and nothing else, over the full wallpaper. It is the screen looked
+   at longest with nothing to read, so it gets the two most generous effects in
+   the file.
+
+   The glint is a pseudo-element rather than a `background-position` animation
+   on the card, and that is deliberate: the composer card is a
+   `backdrop-filter` surface, and moving its own background would make the blur
+   underneath it recompute every frame. A pseudo-element repaints alone.
+
+   ## Why the lift composes instead of replacing
+
+   Two effects write to this card's `transform` in the hero:
+
+   - `effects.css` lifts it 1px on `[data-composer-card]:focus-within`, which is
+     the *entrance affordance* — it says "this box is live, type here". The
+     composer auto-focuses at boot, so in the hero this is always on.
+   - this block breathes it between 0 and −0.5% forever, so the card is never
+     perfectly still on a screen with nothing else moving.
+
+   The hero breathing was written as a plain `animation`, which is wrong, and it
+   was wrong in the way that is hardest to see: an animation at the *animation*
+   origin beats a normal declaration regardless of specificity or sheet order, so
+   `fa-hero-lift` replaced the focus lift outright rather than adding to it. The
+   card still showed a transform, and still moved — it just measured
+   `matrix(1, 0, 0, 1, 0, -0.53)` where the lift alone is `-1`, so the affordance
+   was silently gone and the probe that caught it was reading a real defect.
+
+   The fix is `animation-composition: add`, which is what the effect was always
+   meant to be: the breathing is a delta on top of whatever the cascade put
+   there. Both writers survive in every combination — focused or not, hero or
+   not — and neither has to know about the other. `add` is the default for
+   transform *lists* in the Web Animations API but not for `@keyframes`
+   animations, which is why it has to be said out loud here.
+
+   **And the delta must not be a second `translate3d`.** Under `add`, two
+   translations merge into one matrix rather than nesting: the focus lift's
+   `translate3d(0, -1px, 0)` and a breathing `translate3d(0, -0.5%, 0)` compose
+   to `matrix(1, 0, 0, 1, 0, -1)` — which carries *no scale term at all*, so the
+   breathing contributed translation and silently dropped the scaleY that the
+   focus lift exists to show. The interim reading of `-1.29px` looked like a
+   working composition and was really the merged translation overshooting the
+   lift. `scale` composes multiplicatively and sits outside the `transform`
+   list, so it survives the merge: the card breathes by a hair's scale while the
+   focus lift keeps its own scaleY, both at once.
+
+   `html.fa-tier-full` scopes it to the tier that exists to be the expensive
+   one, matching the rest of the desktop layer; at `lite` and `off` the animation
+   does not run at all and the focus lift is untouched. */
+
+html.fa-tier-full [data-phase="hero"] [data-composer-card] {
+  animation: fa-hero-lift 7.4s ease-in-out infinite;
+  animation-composition: add;
+}
+
+html.fa-tier-full [data-phase="hero"] [data-composer-card]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 36%,
+    color-mix(in srgb, var(--fa-gloss-top) 32%, transparent) 50%,
+    transparent 64%
+  );
+  opacity: 0;
+  animation: fa-hero-glint 9.8s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+}
+
+@keyframes fa-hero-lift {
+  0%,
+  100% {
+    scale: 1 1 1;
+  }
+  50% {
+    scale: 1 0.99 1;
+  }
+}
+
+@keyframes fa-hero-glint {
+  0%,
+  6% {
+    opacity: 0;
+    transform: translate3d(-36%, 0, 0);
+  }
+  44% {
+    opacity: 0.6;
+  }
+  84%,
+  100% {
+    opacity: 0;
+    transform: translate3d(36%, 0, 0);
+  }
+}
+
+/* ── the transcript ───────────────────────────────────────────────────────── */
+
+/* Each turn ends in a `data-turn-tail` block, and that block mounts once per
+   turn and is never re-created while the turn streams. It is the one node in
+   the transcript that is safe to give an entrance to, and it is the node whose
+   arrival a reader is actually waiting for. */
+[data-turn-tail] {
+  animation: fa-turn-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fa-turn-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* The collapsible process disclosure — "thinking", tool calls, subagents. It is
+   opened and closed *while* a turn streams, so an entrance here would replay on
+   every token. A transition on the summary row is idempotent and reads as the
+   panel breathing rather than as it arriving. */
+[data-turn-process] > *,
+[data-disclosure-row] {
+  transition:
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms ease-out,
+    background-color 220ms ease-out;
+}
+
+[data-turn-process] > *:hover,
+[data-disclosure-row]:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* The chevron that carries `data-expandable` is the affordance that says the
+   row does something. It rotates on the product's own state attribute rather
+   than on `:hover`, so the motion means "this is open" instead of "a pointer is
+   nearby" — and it is a transform, so it composites. */
+[data-expandable] {
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* A tool call riding inside a flow. The row is reused as the call advances
+   through its states, so: transition, not entrance. The `data-state` values are
+   the product's own — the row is tinted by state rather than animated on
+   change, because a state change during streaming would otherwise re-trigger a
+   motion the reader did not cause. */
+[data-chat-flow] [data-chat-flow-kind] {
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease-out,
+    background-color 240ms ease-out;
+}
+
+[data-chat-flow] [data-chat-flow-kind]:hover {
+  transform: translate3d(2px, 0, 0);
+}
+
+/* The turn's own vertical marker: a hairline that says where one exchange ends
+   and the next begins. Drawn as a pseudo-element, so no turn's box moves and no
+   label can be pushed or clipped by it. */
+[data-chat-turn] {
+  position: relative;
+}
+
+[data-chat-turn]::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 -4px;
+  width: 2px;
+  border-radius: 2px;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--fa-sky-mid) 62%, transparent);
+  transform: translate3d(-3px, 0, 0) scaleY(0.4);
+  transition:
+    opacity 260ms ease-out,
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-chat-turn]:hover::before {
+  opacity: 0.9;
+  transform: translate3d(0, 0, 0) scaleY(1);
+}
+
+/* ── the right panel ────────────────────────────────────────────────────────
+   No loops here, by the rule recorded in `effects.css`: the panel already
+   transitions its own `transform` and `visibility`, and a second transform
+   animation would fight it. What is left is everything *inside* the panel,
+   which the panel does not touch — and the panel's contents are where a reader
+   spends the whole of a file-review.
+
+   The toggle and the expand affordance get a genuine motion because they are
+   the two controls on the panel's own chrome. */
+
+[data-sidebar-right-toggle],
+[data-sidebar-right-expand] {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease-out;
+}
+
+[data-sidebar-right-toggle]:hover,
+[data-sidebar-right-expand]:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* A panel's list rows. `li` and `[role="listitem"]` rather than a class, because
+   the panel's row components are several different modules and only the element
+   semantics are common to all of them. The panel's body is matched by its
+   dockkit pane rather than by `[data-fa-col="rightbar"]`, and that is measured
+   rather than assumed: when the panel is opened at `fullscreen` mode — which is
+   how it opens by default at this width — its body is *not* a descendant of the
+   rightbar column, so the column-scoped selector matched nothing at all. */
+[data-dockkit-pane] li,
+[data-dockkit-pane] [role="listitem"],
+[data-fa-col="rightbar"] li,
+[data-fa-col="rightbar"] [role="listitem"] {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease-out,
+    background-color 220ms ease-out;
+}
+
+[data-dockkit-pane] li:hover,
+[data-dockkit-pane] [role="listitem"]:hover,
+[data-fa-col="rightbar"] li:hover,
+[data-fa-col="rightbar"] [role="listitem"]:hover {
+  transform: translate3d(2px, 0, 0);
+}
+
+/* ── the dockkit surfaces ───────────────────────────────────────────────────
+   Transitions only. `effects.css` records why: these are the surfaces beneath
+   a control the user may be *dragging* (the width handle, the pane splitter),
+   and a surface that animates while being dragged is a moving target. A
+   transition on hover and on the product's own active state is safe; a loop is
+   not. */
+
+[data-dockkit-surface],
+[data-dockkit-pane],
+[data-dockkit-strip] {
+  transition:
+    opacity 240ms ease-out,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 240ms ease-out;
+}
+
+[data-dockkit-strip-fill],
+[data-dockkit-strip-tabs],
+[data-dockkit-strip-chrome] {
+  transition:
+    opacity 220ms ease-out,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-dockkit-pane]:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* The width handle is the one draggable control that benefits from a *visible*
+   response, so it brightens to a full-width affordance from a half-height one
+   over a transition rather than snapping. Nothing here changes its hit box: the
+   change is inside the element, on a pseudo-element. */
+[data-width-handle] {
+  position: relative;
+}
+
+[data-width-handle]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--fa-sky-mid) 52%, transparent);
+  transform: scaleY(0.55);
+  transition:
+    opacity 200ms ease-out,
+    transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-width-handle]:hover::after {
+  opacity: 0.7;
+  transform: scaleY(1);
+}
+
+/* A step in a process disclosure — a tool call, a subagent, an assistant step.
+   Each carries the product's own `data-state`, and the values it actually
+   publishes are read off a running page rather than guessed: `idle` and `ok`.
+   The obvious-looking `running` / `pending` are not among them, and a rule
+   written against either would be invisible forever.
+
+   This is the one *loop* in the whole transcript region, and it is here because
+   a settled step is the only thing in a transcript that benefits from saying
+   "done, and it looks it" rather than "this changed". It is a glow that
+   breathes on the step's own leading marker at 2.6s — slow enough to read as
+   breathing, and the only effect in the file the reader is meant to *notice*
+   while it runs. Every other loop in this project is a wallpaper or a light,
+   and is meant to be found rather than watched.
+
+   Sizing note: the host is 5px, which is under the 44px target floor — but it
+   is a `pointer-events: none` pseudo-element on an element that is neither a
+   link nor a control, so it can never be the target of a tap. The mark sits on
+   the step's own box, so it costs one layer per visible step and nothing per
+   message.
+
+   Selector note — this chain is the *only* one that matches, and the two
+   alternatives that look more obvious were measured dead on a page with three
+   conversations open:
+
+     `[data-chat-flow] [data-chat-flow-kind] [data-state="ok"]`   -> 3 matches
+     `[data-chat-flow] [data-chat-flow-kind][data-state="ok"]`    -> 0
+     `[data-turn-process] [data-state="ok"]`                      -> 0
+
+   The kind row is an *ancestor* of the step row, never the step row itself, so
+   the space-descendant form is required; and `[data-turn-process]` exists but
+   never contains a `[data-state="ok"]`. Writing all three "to be safe" is how
+   two thirds of this block came to be dead weight. */
+[data-chat-flow] [data-chat-flow-kind] [data-state="ok"]::before {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 0;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--fa-sky-mid) 82%, transparent);
+  animation: fa-step-pulse 2.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes fa-step-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.72);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.24);
+  }
+}
+
+/* ── the sidebar's contents ─────────────────────────────────────────────────
+   `effects.css` owns the brand mark, the rail and the settings surface. What it
+   does not touch is the *inside* of the sidebar: the workspace list, its rows,
+   and the footer actions. Those are the surfaces a pointer actually lands on,
+   so they are where a hover has to be definite rather than decorative.
+
+   Rows are transitions, not entrances: the session list is re-keyed when a
+   session is created or renamed, and an entrance would replay on a list that
+   had merely been re-sorted. */
+
+[data-slot="sidebar.workspaces"] a,
+[data-slot="sidebar.workspaces"] button,
+[data-slot="sidebar.footer.action"],
+[data-slot="sidebar.workspaces.directoryFlow"] * {
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease-out,
+    background-color 200ms ease-out;
+}
+
+[data-slot="sidebar.workspaces"] a:hover,
+[data-slot="sidebar.workspaces"] button:hover,
+[data-slot="sidebar.footer.action"]:hover {
+  transform: translate3d(2px, 0, 0);
+}
+
+/* ── overlays and dialogs ───────────────────────────────────────────────────
+   `effects.css` gives the overlay layer its chrome. What it leaves is the
+   *inside* of a dialog, and a dialog is the most-scrutinised surface in the
+   product: it is where a person goes to change something, and where a stalled
+   animation is most obvious.
+
+   Everything here is a transition on a state the product already sets or a
+   pseudo-class the engine evaluates for free. There is deliberately no entrance
+   on a dialog: a dialog can be opened, closed and re-opened without unmounting,
+   so "mounted once" is not a property any of its nodes has. */
+
+/* The overlay layer gets nothing here on purpose.
+
+   It looks like an obvious place for a longer, softer scrim fade — and it is
+   wrong. `material.css` already makes the scrim `transparent`, and the measured
+   computed value is `transition-property: opacity, visibility` with an apparent
+   `0.3s`, because the class names are *hashed per build* and the duration comes
+   from a product rule. A competing `transition` declared here would be decided
+   by specificity and source order against a selector that cannot be named, and
+   the failure mode is a scrim that fades *faster* than it used to — a regression
+   that only appears in a build whose hash happens to differ.
+
+   The lesson generalises to the rest of this file: only add a transition where
+   the element has none, or where the existing one can be read and beaten
+   honestly. Everything below and above was checked that way. */
+
+[data-fa-dialog] [role="dialog"] {
+  transition:
+    transform 340ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 260ms ease-out;
+}
+
+[data-fa-dialog] [role="dialog"] button,
+[data-fa-dialog] [role="dialog"] [role="menuitem"],
+[data-fa-dialog] [role="dialog"] [data-active] {
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease-out,
+    background-color 200ms ease-out;
+}
+
+[data-fa-dialog] [role="dialog"] button:hover,
+[data-fa-dialog] [role="dialog"] [role="menuitem"]:hover,
+[data-fa-dialog] [role="dialog"] [data-active]:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* ── the composer ───────────────────────────────────────────────────────────
+   `effects.css` owns the caret pulse and the placeholder shimmer. This adds the
+   parts around them.
+
+   The seat is an entrance because it mounts with the composer and the composer
+   is stable for the life of a session; the chips are transitions because the
+   same chip node is reused as the user edits. The stats line brightens while
+   the composer holds focus, which is a signal that a keystroke is going into
+   *this* box rather than a decoration. */
+
+[data-composer-seat] {
+  animation: fa-seat-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fa-seat-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+[data-composer-stats] {
+  opacity: 0.72;
+  transition:
+    opacity 260ms ease-out,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* This one is worth reading twice, because the obvious version is dead.
+
+   The natural selector is `[data-composer-card]:focus-within [data-composer-stats]`,
+   and it matches **nothing** — not "matches nothing right now", but nothing ever.
+   The measured ancestry of the stats node, read off the running page:
+
+       0  div  .bOPqQW_root                       [data-composer-stats]
+       1  div                                     [data-slot]
+       2  div  .uV2eYG_root
+       3  div                                     [data-slot]
+       4  div  .wSkVaW_composerStack
+       5  div                                     [data-chain-overlay-fallback]
+       6  div                                     [data-slot]
+       7  div  .wSkVaW_composerSeat               [data-composer-seat]
+       8  div  .wSkVaW_scrollBody                 [data-conversation-scroll]
+
+   The card and the stats are **siblings** — both live under the composer stack
+   — so a descendant combinator from the card can never reach the stats, and the
+   card's focus state can never drive them.
+
+   The stack itself would be the natural hook, and it is *not usable*: its only
+   identifier is the hashed class `.wSkVaW_composerStack`, which the product
+   regenerates every build. `material.css` records why this project refuses to
+   select on those. `[data-composer-seat]` is the nearest ancestor that is both
+   a common ancestor of the two and a stable attribute, so the state moves
+   there. `:focus-within` is still a pseudo-class the engine evaluates for free,
+   so there is no observer and no published state to keep in sync.
+
+   A count-based audit sees a rule matching zero and cannot tell "wrong time"
+   from "wrong selector". This survived the first pass for exactly that reason;
+   it was the ancestry dump that found it. */
+[data-composer-seat]:focus-within [data-composer-stats] {
+  opacity: 1;
+  transform: translate3d(0, -1px, 0);
+}
+
+/* The composer's controls. `data-composer-input` is the `contenteditable`
+   editor itself and holds no buttons — and at a desktop width it can also
+   report `contenteditable="false"` with a "pick a model first" placeholder, so
+   even a rule aimed at its children would be aimed at nothing. The card is the
+   real container, and this is the selector the running page confirmed. */
+[data-composer-card] button,
+[data-composer-card] [role="button"],
+[data-composer-card] [role="menuitem"] {
+  transition:
+    transform 200ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 180ms ease-out,
+    background-color 200ms ease-out;
+}
+
+[data-composer-card] button:hover,
+[data-composer-card] [role="button"]:hover,
+[data-composer-card] [role="menuitem"]:hover {
+  transform: translate3d(0, -1px, 0);
+}
+
+/* ── the canvas ─────────────────────────────────────────────────────────────
+   A conversation column scrolled away from its own top gets a faint wash at the
+   top edge, so the transcript reads as *continuing* past the edge rather than
+   as having been cut. It keys off the same published state the scroll-edge
+   masks already use, so there is nothing new to keep in sync — and it is an
+   opacity transition on a pseudo-element, so it costs nothing at rest. */
+
+[data-fa-canvas]::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 120px;
+  pointer-events: none;
+  opacity: 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fa-sky-low) 26%, transparent) 0%,
+    transparent 100%
+  );
+  transition: opacity 420ms ease-out;
+}
+
+[data-fa-canvas]:has([data-fa-scrolled="middle"])::before,
+[data-fa-canvas]:has([data-fa-scrolled="bottom"])::before {
+  opacity: 1;
+}
+
+/* ── the stop rules ─────────────────────────────────────────────────────────
+   Every loop declared above has a stop rule here, plus the one-shot entrances
+   are neutralised at `off`. They are written as one block rather than beside
+   each effect because the question a reader actually asks is "at `lite`, what
+   still moves" — and that is a question about a set, not about a rule.
+
+   Two shapes of stop, and the distinction is load-bearing:
+
+   - `animation: none` for an effect that is decorative *on top of* a surface
+     that must stay: the surface remains, the motion goes.
+   - the element is hidden for an effect that exists *only* to move.
+
+   Every stop below is the first shape, which means `effects-tiers.mjs` is
+   checking a genuine "stop" rather than a "hide" — and the two would look
+   identical to any probe that only asked whether `animation-name` was `none`.
+   At `lite` the one-shot entrances are *kept*: they cost nothing at rest, they
+   happen once, and they are the difference between a panel appearing and a
+   panel arriving. That is why this block lists exceptions instead of applying
+   one blanket rule. */
+
+  html.fa-tier-lite [data-dsh-boot]::after,
+  html.fa-tier-off [data-dsh-boot]::after,
+  /* Selector must carry `html.fa-tier-full`'s full weight to win: the hero lift
+     above is `html.fa-tier-full [data-phase="hero"] [data-composer-card]`, and a
+     two-class selector here would lose to it on specificity. `fa-tier-lite` on
+     the same elements is impossible — the tier classes are mutually exclusive —
+     so this is the only way to write "stop what full started". */
+  html.fa-tier-lite [data-phase="hero"] [data-composer-card],
+  html.fa-tier-off [data-phase="hero"] [data-composer-card],
+  html.fa-tier-lite [data-phase="hero"] [data-composer-card]::after,
+  html.fa-tier-off [data-phase="hero"] [data-composer-card]::after,
+  html.fa-tier-lite [data-chat-flow] [data-chat-flow-kind] [data-state="ok"]::before,
+  html.fa-tier-off [data-chat-flow] [data-chat-flow-kind] [data-state="ok"]::before {
+    animation: none;
+  }
+
+  /* The one-shot entrances retire at `off` and stay at `lite`. Both of these
+     nodes mount once, so this is the only place in the file where "animation:
+     none" and "display: none" would look the same in the output — they are not
+     the same thing, and the node stays painted either way. */
+  html.fa-tier-off [data-turn-tail],
+  html.fa-tier-off [data-composer-seat] {
+    animation: none;
+  }
+
+  /* The persistent transitions are deliberately *not* stopped at any tier. A
+     transition is not an effect that runs; it is how a change is drawn when it
+     happens, and removing it at `off` would make the product's own state
+     changes snap. `effects-perf.mjs` checks exactly this: animations vanish at
+     `off` while transitions survive. */
+}

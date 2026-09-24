@@ -83,7 +83,29 @@ async function shot(name, viewport, dpr, mobile, prepare, scheme, locale) {
 await shot('desktop-light', DESKTOP, 2, false, async (p) => { await scrollMid(p); await p.waitForTimeout(1600) }, 'Light')
 await shot('desktop-dark', DESKTOP, 2, false, async (p) => { await scrollMid(p); await p.waitForTimeout(1600) }, 'Dark')
 await shot('desktop-settings', DESKTOP, 2, false, async (p) => {
-  await p.locator('[aria-label="Settings"]').first().click({ force: true }); await p.waitForTimeout(2400)
+  // Find the desktop settings trigger structurally, not by its label.
+  //
+  // `[aria-label="Settings"]` resolved to a *zero-sized* node and Playwright
+  // failed with "scrolling into view if needed" — because the only English-
+  // labelled "Settings" on the page belongs to the **mobile dock**, which is
+  // `display: none` at desktop widths. The real desktop control renders the
+  // locale's own string (`设置` under zh-CN), so matching on English was never
+  // going to find it once a Chinese locale was stored.
+  //
+  // Anchoring on the sidebar footer position instead makes the step independent
+  // of both the locale and the product's hashed class names.
+  await p.evaluate(`(() => {
+    const visible = [...document.querySelectorAll('button, [role="button"], a[href]')]
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 40 && r.height >= 24 })
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+    // Bottom of the left column, i.e. the sidebar footer where the app puts it.
+    const best = visible
+      .filter((v) => v.r.left < 320 && v.r.top > window.innerHeight * 0.75)
+      .sort((a, b) => b.r.top - a.r.top)[0]
+    if (best) { best.el.setAttribute('data-fa-shot-settings', ''); }
+  })()`)
+  await p.locator('[data-fa-shot-settings]').first().click({ force: true })
+  await p.waitForTimeout(2400)
 }, 'Light')
 await shot('phone-light', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Light')
 await shot('phone-dark', PHONE, 3, true, async (p) => { await p.waitForTimeout(800) }, 'Dark')
